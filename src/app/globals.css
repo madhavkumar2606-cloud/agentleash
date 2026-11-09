@@ -18,6 +18,10 @@
   --color-block-bg: #fbe5e2;
 
   --color-pp: #003087;
+
+  /* AgentLeash's scanner: used only where hidden text is detected */
+  --color-uv: #5a3ee0;
+  --color-uv-bg: #efebff;
   --color-pp-light: #0070e0;
 }
 
@@ -44,8 +48,8 @@ body {
 
 /* Draws the eye to the hidden instruction once, when it appears in the agent trace. */
 @keyframes pulse-ring {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 138, 122, 0); }
-  50% { box-shadow: 0 0 0 4px rgba(255, 138, 122, 0.45); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(169, 150, 255, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(169, 150, 255, 0.55); }
 }
 .pulse-twice { animation: pulse-ring 700ms ease-in-out 2; }
 
@@ -72,13 +76,58 @@ body {
 @keyframes pop { from { opacity: 0; scale: 0.2; } to { opacity: 1; scale: 1; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 .reveal { animation: reveal 500ms ease-out 400ms both; }
-.packet { animation: packet 1100ms cubic-bezier(.4,0,.2,1) 1100ms both; }
-.gate { animation: gate 200ms ease-out 2200ms both; }
-.stop { animation: pop 260ms cubic-bezier(.2,.9,.3,1.3) 2250ms both; }
-.verdict { animation: fade 400ms ease-out 2450ms both; }
+.packet { animation: packet 1100ms cubic-bezier(.4,0,.2,1) 2000ms both; }
+.gate { animation: gate 200ms ease-out 3100ms both; }
+.stop { animation: pop 260ms cubic-bezier(.2,.9,.3,1.3) 3150ms both; }
+.verdict { animation: fade 400ms ease-out 3350ms both; }
+
+/* UV scan: a violet beam sweeps the blank note box and leaves the hidden text visible behind it. */
+@keyframes uv-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes uv-beam { from { left: -3.5rem; opacity: 1; } 92% { opacity: 1; } to { left: 100%; opacity: 0; } }
+.uv-text { animation: uv-reveal 1200ms linear 500ms both; }
+.uv-beam {
+  background: linear-gradient(90deg, transparent, rgba(90, 62, 224, 0.35) 60%, rgba(90, 62, 224, 0.75) 92%, transparent);
+  animation: uv-beam 1200ms linear 500ms both;
+}
+.uv-label { animation: fade 300ms ease-out 1700ms both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal, .gate, .stop, .verdict { animation: none; }
+  .reveal, .gate, .stop, .verdict, .uv-text, .uv-label { animation: none; }
+  .uv-beam { display: none; }
   .gate { border-color: #ff8a7a; color: #ff8a7a; }
   .packet { animation: none; left: calc(100% - 2.6rem); }
+}
+
+/* Verdict receipt: paper slip with punched edges, lifted off the page. */
+.receipt {
+  background: var(--color-card);
+  -webkit-mask:
+    radial-gradient(circle 5px at 50% 0, transparent 97%, #000) top / 16px 51% repeat-x,
+    radial-gradient(circle 5px at 50% 100%, transparent 97%, #000) bottom / 16px 51% repeat-x;
+          mask:
+    radial-gradient(circle 5px at 50% 0, transparent 97%, #000) top / 16px 51% repeat-x,
+    radial-gradient(circle 5px at 50% 100%, transparent 97%, #000) bottom / 16px 51% repeat-x;
+}
+.receipt-shadow { filter: drop-shadow(0 1px 0 var(--color-line)) drop-shadow(0 14px 22px rgba(22, 21, 15, 0.10)); }
+
+/* The stamp thumps down once the verdict is in. */
+@keyframes stamp {
+  0% { opacity: 0; scale: 1.8; }
+  60% { opacity: 1; scale: 0.94; }
+  100% { opacity: 0.9; scale: 1; }
+}
+.stamp { animation: stamp 420ms cubic-bezier(.2,.8,.3,1.2) 150ms both; mix-blend-mode: multiply; }
+
+/* Risk dial sweeps from zero to the score. */
+@keyframes dial-arc { from { stroke-dashoffset: 106.8; } to { stroke-dashoffset: var(--dial-off); } }
+@keyframes dial-needle { from { transform: rotate(-90deg); } to { transform: rotate(var(--needle)); } }
+.dial-arc { animation: dial-arc 700ms cubic-bezier(.2,.7,.2,1) 200ms both; }
+.dial-needle { animation: dial-needle 700ms cubic-bezier(.2,.7,.2,1) 200ms both; }
+
+/* "Checking purchase…" heartbeat */
+@keyframes scan-dot { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+.scan-dot { animation: scan-dot 900ms ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp, .dial-arc, .dial-needle, .scan-dot { animation: none; }
 }

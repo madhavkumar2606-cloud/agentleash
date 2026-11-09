@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckPill, PaymentChip, PayPalMark, usd, VerdictBadge } from "@/components/ui";
+import { FlowBar } from "@/components/FlowBar";
+import { PriceLine, Stamp } from "@/components/Receipt";
+import { CheckPill, PaymentChip, PayPalMark, usd } from "@/components/ui";
 import { getDecision } from "@/lib/store";
 import ApproveActions from "./ApproveActions";
 
@@ -20,10 +22,19 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
         Your agent wants to spend <span className="tabular-nums">{usd(d.amount)}</span>
       </h1>
 
-      <section className="mt-5 rounded-xl border border-line bg-card p-5">
-        <p className="font-semibold">
-          {p.quantity} × {p.title}
-        </p>
+      <section className="receipt-shadow mt-5">
+        <div className="receipt px-5 pb-7 pt-7">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Purchase check</p>
+            <p className="font-mono text-xs text-muted">#{d.id.slice(4, 12)} · risk {d.riskScore}/100</p>
+          </div>
+          <div className="-rotate-[8deg]">
+            <Stamp verdict={d.payment.status === "captured" ? "ALLOW" : d.verdict} />
+          </div>
+        </div>
+        <hr className="my-4 border-t-2 border-dashed border-line" />
+        <PriceLine left={`${p.quantity} × ${p.title}`} right={usd(d.amount)} />
         <p className="text-sm text-muted">{p.merchantName}</p>
         <dl className="mt-4 space-y-3 text-sm">
           <div>
@@ -35,9 +46,7 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
             <dd>{p.agentReasoning}</dd>
           </div>
         </dl>
-        <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
-          <VerdictBadge verdict={d.verdict} />
-          <span className="text-xs text-muted">Risk {d.riskScore}/100</span>
+        <FlowBar verdict={d.verdict} payment={d.payment.status} amount={d.amount} />
         </div>
       </section>
 

@@ -6,6 +6,7 @@ import type { Scenario } from "@/lib/agent";
 import type { AgentStep, Decision, Mandate } from "@/lib/types";
 import { FlowBar } from "./FlowBar";
 import { QrCode } from "./QrCode";
+import { PriceLine, RiskDial, ScenarioIcon, SpendRing, Stamp } from "./Receipt";
 import { CheckPill, PaymentChip, PayPalMark, usd, VerdictBadge } from "./ui";
 
 interface AppState {
@@ -130,7 +131,6 @@ export default function Dashboard() {
   const hasLlm = data.modes.llm !== "mock";
   const traceDone = run ? shown > run.steps.length : false;
   const p = data.mandate.policy;
-  const spentPct = Math.min(100, (data.weeklySpent / p.weeklyLimit) * 100);
   const blockedCount = data.decisions.filter((d) => d.verdict === "BLOCK").length;
   const savedAmount = data.decisions.filter((d) => d.verdict === "BLOCK").reduce((s, d) => s + d.amount, 0);
 
@@ -221,20 +221,14 @@ export default function Dashboard() {
 
           <section className="rounded-xl border border-line bg-card p-5">
             <h2 className="text-sm font-semibold">This week</h2>
-            <p className="mt-2 text-2xl font-semibold tabular-nums">
-              {usd(data.weeklySpent)} <span className="text-sm font-normal text-muted">of ${p.weeklyLimit}</span>
-            </p>
-            <div
-              className="mt-2 h-2 overflow-hidden rounded-full bg-line"
-              role="progressbar"
-              aria-valuenow={Math.round(spentPct)}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Weekly agent spending"
-            >
-              <div className="h-full rounded-full bg-ink transition-all" style={{ width: `${spentPct}%` }} />
+            <div className="mt-3 flex items-center gap-4">
+              <SpendRing spent={data.weeklySpent} limit={p.weeklyLimit} />
+              <div>
+                <p className="text-2xl font-semibold tabular-nums">{usd(data.weeklySpent)}</p>
+                <p className="text-sm text-muted">spent of ${p.weeklyLimit} weekly limit</p>
+              </div>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4 text-sm">
               <div>
                 <p className="text-xs text-muted">Purchases blocked</p>
                 <p className="font-semibold tabular-nums">{blockedCount}</p>
@@ -279,7 +273,8 @@ export default function Dashboard() {
                     run?.scenario.id === s.id ? "border-ink" : "border-line"
                   }`}
                 >
-                  <p className="text-sm font-semibold">{busy === s.id ? "Running…" : s.label}</p>
+                  <ScenarioIcon id={s.id} />
+                  <p className="mt-3 text-sm font-semibold">{busy === s.id ? "Running…" : s.label}</p>
                   <p className="mt-1 text-xs leading-relaxed text-muted">{s.blurb}</p>
                 </button>
               ))}
@@ -345,7 +340,7 @@ export default function Dashboard() {
                       <span className={`w-24 shrink-0 text-xs uppercase tracking-wide ${s.kind === "propose" ? "text-[#f5c26b]" : "text-paper/50"}`}>
                         {STEP_LABEL[s.kind]}
                       </span>
-                      <span className={s.tainted ? "rounded bg-block/25 px-1.5 py-0.5 text-[#ffb4a9]" : ""}>
+                      <span className={s.tainted ? "text-paper/80" : ""}>
                         <TaintedText text={s.kind === "search" ? shortenResults(s.text) : s.text} tainted={!!s.tainted} />
                       </span>
                     </li>
@@ -357,13 +352,18 @@ export default function Dashboard() {
               </section>
 
               {/* Firewall decision */}
-              <section className="rounded-xl border border-line bg-card p-5" aria-live="polite">
+              <section className="receipt-shadow" aria-live="polite">
                 {traceDone && !run.decisionId ? (
-                  <div className="grid h-full min-h-48 place-items-center text-center text-sm text-muted">
+                  <div className="receipt grid min-h-48 place-items-center px-6 py-10 text-center text-sm text-muted">
                     The agent decided not to buy anything, so there was nothing to check.
                   </div>
                 ) : !traceDone || !decision ? (
-                  <div className="grid h-full min-h-48 place-items-center text-sm text-muted">Checking purchase…</div>
+                  <div className="receipt grid min-h-48 place-items-center px-6 py-10 text-sm text-muted">
+                    <span className="flex items-center gap-2">
+                      <span className="scan-dot h-2 w-2 rounded-full bg-ink" aria-hidden />
+                      Checking purchase…
+                    </span>
+                  </div>
                 ) : (
                   <DecisionCard d={decision} origin={origin} />
                 )}
@@ -433,32 +433,39 @@ export default function Dashboard() {
 
 function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
   const approveUrl = `${origin}/approve/${d.id}`;
+  const time = new Date(d.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return (
-    <div className="rise">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="receipt rise px-6 pb-7 pt-7">
+      {/* Header: what this is, when, and the stamp */}
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted">AgentLeash verdict</p>
-          <div className="mt-2">
-            <VerdictBadge verdict={d.verdict} size="lg" />
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted">Risk</p>
-          <p className={`text-2xl font-semibold tabular-nums ${d.riskScore >= 60 ? "text-block" : d.riskScore >= 25 ? "text-review" : "text-allow"}`}>
-            {d.riskScore}
-            <span className="text-sm font-normal text-muted">/100</span>
+          <p className="text-sm font-semibold">Purchase check</p>
+          <p className="mt-0.5 font-mono text-xs text-muted">
+            {time} · #{d.id.slice(4, 12)}
           </p>
+        </div>
+        <div className="-mr-1 -mt-1 -rotate-[8deg]">
+          <Stamp verdict={d.verdict} />
         </div>
       </div>
 
-      <p className="mt-3 text-[15px] font-medium leading-snug">{d.summary}</p>
-      <p className="mt-1 text-sm text-muted">
-        {d.proposal.quantity} × {d.proposal.title} · {d.proposal.merchantName} · <span className="tabular-nums">{usd(d.amount)}</span>
+      <hr className="my-4 border-t-2 border-dashed border-line" />
+
+      <PriceLine left={`${d.proposal.quantity} × ${d.proposal.title}`} right={usd(d.amount)} />
+      <p className="mt-1 text-sm text-muted">{d.proposal.merchantName}</p>
+      <p className="mt-2 text-xs leading-relaxed text-muted">
+        <span className="font-medium text-ink">Task:</span> {d.proposal.task}
       </p>
 
+      <hr className="my-4 border-t-2 border-dashed border-line" />
+
+      <div className="flex items-start gap-4">
+        <p className="flex-1 text-[15px] font-medium leading-snug">{d.summary}</p>
+        <RiskDial score={d.riskScore} />
+      </div>
       <FlowBar verdict={d.verdict} payment={d.payment.status} amount={d.amount} />
 
-      <ul className="mt-4 divide-y divide-line border-y border-line">
+      <ul className="divide-y divide-dashed divide-line border-y-2 border-dashed border-line">
         {d.checks.map((c) => (
           <li key={c.id} className="flex gap-3 py-2.5">
             <CheckPill status={c.status} />
@@ -548,8 +555,8 @@ function TaintedText({ text, tainted }: { text: string; tainted: boolean }) {
   return (
     <>
       {before}
-      <span className="pulse-twice mt-1 block rounded border border-[#ffb4a9]/40 p-2 text-[#ffd7d0]">
-        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#ff8a7a]">Hidden on page (invisible to humans)</span>
+      <span className="pulse-twice mt-1 block rounded border border-dashed border-[#a996ff]/60 bg-[#5a3ee0]/20 p-2 text-[#d9d0ff]">
+        <span className="mb-1 block font-sans text-[11px] font-semibold text-[#b9a8ff]">Hidden text found. Invisible to you, read by the agent:</span>
         {m[1]}
       </span>
       {after.replace(/​/g, "")}
