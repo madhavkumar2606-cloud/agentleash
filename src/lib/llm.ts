@@ -5,7 +5,8 @@
 import type { z } from "zod";
 import { llmConfig } from "./config";
 
-async function callProvider(system: string, user: string): Promise<string> {
+/** Raw provider call. Throws on any error (used by the self-test for diagnostics). */
+export async function llmRaw(system: string, user: string): Promise<string> {
   const { provider, apiKey, model } = llmConfig();
 
   if (provider === "gemini") {
@@ -48,7 +49,8 @@ async function callProvider(system: string, user: string): Promise<string> {
   }
 
   if (provider === "openai") {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const base = (process.env.LLM_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+    const res = await fetch(`${base}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
@@ -89,7 +91,7 @@ export async function llmJson<T>(
 ): Promise<T | null> {
   if (llmConfig().provider === "mock") return null;
   try {
-    const text = await callProvider(system, user);
+    const text = await llmRaw(system, user);
     const parsed = schema.safeParse(extractJson(text));
     if (!parsed.success) {
       console.warn("[llm] schema mismatch", parsed.error.issues);

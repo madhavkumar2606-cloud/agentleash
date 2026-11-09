@@ -15,9 +15,11 @@ interface AppState {
 }
 
 interface Run {
-  scenario: Scenario;
+  scenario: Pick<Scenario, "id" | "label" | "task">;
   steps: AgentStep[];
-  decisionId: string;
+  decisionId: string | null;
+  agentMode: "live" | "scripted";
+  profile?: "careful" | "naive";
 }
 
 const STEP_LABEL: Record<AgentStep["kind"], string> = {
@@ -38,6 +40,8 @@ export default function Dashboard() {
   const [savingRules, setSavingRules] = useState(false);
   const [error, setError] = useState<string>();
   const [origin, setOrigin] = useState("");
+  const [live, setLive] = useState(true);
+  const [customTask, setCustomTask] = useState("");
   const rulesTouched = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -62,8 +66,8 @@ export default function Dashboard() {
     return () => clearTimeout(t);
   }, [run, shown]);
 
-  async function runScenario(id: string) {
-    setBusy(id);
+  async function runAgent(input: { scenario: string } | { task: string }) {
+    setBusy("scenario" in input ? input.scenario : "custom");
     setError(undefined);
     setRun(undefined);
     setShown(0);
@@ -71,11 +75,17 @@ export default function Dashboard() {
       const res = await fetch("/api/agent/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenario: id }),
+        body: JSON.stringify({ ...input, live }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Run failed");
-      setRun({ scenario: body.scenario, steps: body.steps, decisionId: body.decision.id });
+      setRun({
+        scenario: body.scenario,
+        steps: body.steps,
+        decisionId: body.decision?.id ?? null,
+        agentMode: body.agentMode,
+        profile: body.profile,
+      });
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -114,7 +124,8 @@ export default function Dashboard() {
     return <main className="grid min-h-screen place-items-center text-muted">Loading AgentLeash…</main>;
   }
 
-  const decision = run ? data.decisions.find((d) => d.id === run.decisionId) : undefined;
+  const decision = run?.decisionId ? data.decisions.find((d) => d.id === run.decisionId) : undefined;
+  const hasLlm = data.modes.llm !== "mock";
   const traceDone = run ? shown > run.steps.length : false;
   const p = data.mandate.policy;
   const spentPct = Math.min(100, (data.weeklySpent / p.weeklyLimit) * 100);
@@ -226,15 +237,30 @@ export default function Dashboard() {
         {/* Right: run the agent */}
         <div className="space-y-6">
           <section>
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold">Run the shopping agent</h2>
-              <p className="text-xs text-muted">Each scenario is a different way an agent can go wrong.</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-semibold">Run the shopping agent</h2>
+                <p className="text-xs text-muted">Each scenario is a different way an agent can go wrong.</p>
+              </div>
+              <label className={`inline-flex items-center gap-2 text-xs ${hasLlm ? "" : "opacity-50"}`}>
+                <input
+                  type="checkbox"
+                  checked={hasLlm && live}
+                  disabled={!hasLlm}
+                  onChange={(e) => setLive(e.target.checked)}
+                  className="h-4 w-4 accent-ink"
+                />
+                <span>
+                  Live AI agent{" "}
+                  <span className="text-muted">{hasLlm ? "(a real model decides)" : "(add an AI key to enable)"}</span>
+                </span>
+              </label>
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               {data.scenarios.map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => runScenario(s.id)}
+                  onClick={() => runAgent({ scenario: s.id })}
                   disabled={!!busy}
                   className={`group flex flex-col items-start justify-start rounded-xl border bg-card p-4 text-left transition hover:-translate-y-0.5 hover:border-ink disabled:opacity-60 ${
                     run?.scenario.id === s.id ? "border-ink" : "border-line"
@@ -245,6 +271,32 @@ export default function Dashboard() {
                 </button>
               ))}
             </div>
+            <form
+              className="mt-3 flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (customTask.trim().length >= 5) runAgent({ task: customTask.trim() });
+              }}
+            >
+              <label htmlFor="task" className="sr-only">
+                Give the agent your own task
+              </label>
+              <input
+                id="task"
+                value={customTask}
+                onChange={(e) => setCustomTask(e.target.value)}
+                disabled={!hasLlm || !!busy}
+                placeholder={hasLlm ? "Or give the agent your own task, e.g. \"Get my dad a planter under $40\"" : "Custom tasks need an AI key (LLM_PROVIDER + LLM_API_KEY)"}
+                className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm outline-none focus:border-ink disabled:opacity-60"
+              />
+              <button
+                type="submit"
+                disabled={!hasLlm || !!busy || customTask.trim().length < 5}
+                className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-paper disabled:opacity-50"
+              >
+                {busy === "custom" ? "Running…" : "Run"}
+              </button>
+            </form>
           </section>
 
           {!run && (
@@ -261,8 +313,15 @@ export default function Dashboard() {
             <div className="grid gap-6 xl:grid-cols-2">
               {/* Agent trace */}
               <section className="rounded-xl border border-line bg-ink p-5 text-paper">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Agent: demo-shopper-v1</h2>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold">
+                    {run.agentMode === "live" ? "Live AI agent" : "Scripted demo agent"}
+                    {run.profile && (
+                      <span className="ml-2 whitespace-nowrap rounded bg-paper/15 px-1.5 py-0.5 text-[11px] font-medium text-paper/80">
+                        {run.profile === "naive" ? "naive (simulated weak agent)" : "careful"}
+                      </span>
+                    )}
+                  </h2>
                   <span className="font-mono text-xs text-paper/60">{traceDone ? "waiting for firewall" : "browsing…"}</span>
                 </div>
                 <ol className="mt-4 space-y-3 font-mono text-[13px] leading-relaxed">
@@ -281,7 +340,11 @@ export default function Dashboard() {
 
               {/* Firewall decision */}
               <section className="rounded-xl border border-line bg-card p-5" aria-live="polite">
-                {!traceDone || !decision ? (
+                {traceDone && !run.decisionId ? (
+                  <div className="grid h-full min-h-48 place-items-center text-center text-sm text-muted">
+                    The agent decided not to buy anything, so there was nothing to check.
+                  </div>
+                ) : !traceDone || !decision ? (
                   <div className="grid h-full min-h-48 place-items-center text-sm text-muted">Checking purchase…</div>
                 ) : (
                   <DecisionCard d={decision} origin={origin} />

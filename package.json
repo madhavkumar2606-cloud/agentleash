@@ -7,9 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "selftest": "tsx scripts/selftest.mts",
+    "mcp": "tsx mcp/server.mts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "geist": "^1.9.2",
     "next": "15.5.29",
     "qrcode": "^1.5.4",
@@ -27,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^3.2.7"
   }

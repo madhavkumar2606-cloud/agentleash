@@ -35,6 +35,16 @@ npm test                     # firewall tests
 
 Open the dashboard and click **Hijacked by a web page** first.
 
+### Check your setup: `npm run selftest`
+
+Checks your keys and runs every scenario against the real PayPal sandbox and your AI provider, with both the scripted agent and the live AI agent. **The report never prints secrets**, so it's safe to share.
+
+```
+PASS  PayPal sandbox order  order 5O190127TN364715T, checkout at www.sandbox.paypal.com
+PASS  AI provider call  640 ms
+PASS  live injection  naive agent → 5 × Premium Gift Card Bundle ($250.00) → BLOCK | agent FELL for the injection
+```
+
 ### Modes
 
 | | Without keys | With keys |
@@ -43,6 +53,23 @@ Open the dashboard and click **Hijacked by a web page** first.
 | AI checks | Deterministic heuristic engine | Gemini / Claude / OpenAI (`LLM_PROVIDER`) with heuristics kept as a safety floor |
 
 If the AI call fails or returns bad JSON, AgentLeash falls back to the heuristic engine. It never fails open.
+
+### Live AI agent
+
+With an AI key set, the shopping agent is a real model that searches the store, reads raw product pages (hidden text included) and decides for itself. It has two profiles:
+- **careful:** treats page content as untrusted
+- **naive:** trusts store notices and chases deals. It's labelled in the UI as a simulated weak agent, so you can watch a model actually get hijacked.
+
+You can also type your own task ("Get my dad a planter under $40"). The firewall never trusts either profile.
+
+### Getting a Gemini key (free)
+
+Go to https://aistudio.google.com → **Get API key** → Create API key. Then in `.env.local`:
+
+```
+LLM_PROVIDER=gemini
+LLM_API_KEY=your-key
+```
 
 ### Getting PayPal sandbox keys
 
@@ -69,13 +96,32 @@ curl -X POST http://localhost:3000/api/firewall/check \
 
 Response: `verdict`, `summary`, `riskScore`, per-check results, PayPal payment info, and an `approvalUrl` for REVIEW.
 
+## Use it from Claude Desktop, Cursor, or any MCP client
+
+AgentLeash ships an MCP server with two tools, `agentleash_get_rules` and `agentleash_request_purchase`. Any MCP agent then has to clear purchases with the firewall before paying.
+
+```json
+{
+  "mcpServers": {
+    "agentleash": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/agentleash/mcp/server.mts"],
+      "env": { "AGENTLEASH_URL": "http://localhost:3000" }
+    }
+  }
+}
+```
+
 ## Project layout
 
 ```
 src/lib/firewall/   the engine: rules parser, injection, intent, policy, price, seller, budget checks
 src/lib/paypal.ts   PayPal Orders v2 client (sandbox + mock)
 src/lib/llm.ts      swappable LLM adapter (Gemini / Anthropic / OpenAI)
-src/lib/agent.ts    naive demo shopping agent + 5 scenarios
+src/lib/agent.ts    scripted demo agent + 5 scenarios (used without an AI key)
+src/lib/liveAgent.ts real LLM shopping agent (careful / naive profiles)
+mcp/server.mts      MCP server for Claude Desktop / Cursor / other agents
+scripts/selftest.mts  npm run selftest: key + end-to-end check
 src/lib/orchestrator.ts  verdict → PayPal order / approval / capture
 src/app/            dashboard, phone approval page, API routes
 ```
@@ -84,5 +130,4 @@ src/app/            dashboard, phone approval page, API routes
 
 - Vaulted PayPal payment methods so ALLOW verdicts settle with no checkout step (mock mode simulates this today)
 - Seller trust from real PayPal transaction and dispute history
-- An MCP server wrapper so Claude / ChatGPT agents route payments through AgentLeash automatically
 - Persistent storage (currently in-memory)

@@ -4,7 +4,7 @@
 export type LlmProvider = "gemini" | "anthropic" | "openai" | "mock";
 
 const DEFAULT_MODELS: Record<Exclude<LlmProvider, "mock">, string> = {
-  gemini: "gemini-2.5-flash",
+  gemini: "gemini-flash-latest",
   anthropic: "claude-sonnet-4-5",
   openai: "gpt-4.1-mini",
 };
