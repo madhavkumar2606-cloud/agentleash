@@ -167,3 +167,7 @@ src/app/            landing page (/), dashboard (/app), login, phone approval pa
 - Vaulted PayPal payment methods so ALLOW verdicts settle with no checkout step (mock mode simulates this today)
 - Seller trust from real PayPal transaction and dispute history
 - Persistent storage (currently in-memory)
+
+## License
+
+MIT. See [LICENSE](LICENSE).
