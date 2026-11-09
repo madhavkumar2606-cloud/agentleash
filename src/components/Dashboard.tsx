@@ -567,7 +567,7 @@ function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
                   <p className="font-medium">Scan to approve on your phone</p>
                   <p className="mt-1 text-xs text-muted">Or open the approval page here:</p>
                   <a href={`/approve/${d.id}`} className="mt-2 inline-block rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-paper">
-                    Review purchase
+                    {d.toolCall ? "Review request" : "Review purchase"}
                   </a>
                 </div>
               </>

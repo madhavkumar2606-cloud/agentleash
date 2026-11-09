@@ -161,7 +161,7 @@ To see it without an MCP client, open the dashboard, switch to **Support agent Â
 
 ## Record the demo video
 
-`npm run record-demo` drives your real browser through the live site (landing scan, honest purchase, the hijack, phone approval, PayPal payment, audit log), with a visible cursor and steady pacing. It reruns the hijack scenario until the live model falls for the trap (up to `HIJACK_TRIES`, default 3) and pauses for you to log in to PayPal sandbox by hand.
+`npm run record-demo` drives your real browser through the live site (landing scan, honest purchase, the hijack, phone approval and a $79 PayPal payment, then the support agent refunding that payment through the PayPal MCP guard: partial refund, poisoned ticket, full refund approved on the phone, and the audit log), with a visible cursor and steady pacing. It reruns the hijack and poisoned-ticket scenarios until the live model falls for the trap (up to `HIJACK_TRIES`, default 3) and pauses for you to log in to PayPal sandbox by hand.
 
 ```bash
 npx playwright install ffmpeg            # once: the video encoder

@@ -1,4 +1,7 @@
-// Records the AgentLeash demo video by driving a real browser through the live site.
+// Records the AgentLeash demo video by driving a real browser through the live site:
+// landing page, honest purchase, the hijack, phone approval + PayPal payment ($79), then the support agent
+// with PayPal's MCP tools refunding that payment (partial refund, poisoned ticket, full refund held for you),
+// and the audit log.
 //
 //   OWNER_PASSWORD=your-password npm run record-demo
 //
@@ -109,12 +112,29 @@ async function still(page, name) {
   await page.screenshot({ path: join(OUT, `${name}.png`) });
 }
 
-async function runScenario(page, label) {
+async function pace() {
   if (aiRuns++ > 0 && PACE_MS > 0) {
     mark("pace:start");
     await wait(PACE_MS);
     mark("pace:end");
   }
+}
+
+// Support tickets: the card's label turns into "Running…" while the agent works, then back.
+async function runTicket(page, label) {
+  await pace();
+  await smoothScroll(page, 0, 700);
+  const card = page.getByRole("button", { name: new RegExp(label) }).first();
+  await click(page, card);
+  mark(`run:${label}`);
+  await page.getByText("Running…").first().waitFor({ timeout: 10_000 }).catch(() => {});
+  await page.getByText("Running…").first().waitFor({ state: "hidden", timeout: 90_000 });
+  await wait(900);
+  mark(`verdict:${label}`);
+}
+
+async function runScenario(page, label) {
+  await pace();
   await smoothScroll(page, 0, 700);
   await click(page, page.getByRole("button", { name: new RegExp(label) }).first());
   mark(`run:${label}`);
@@ -159,7 +179,7 @@ try {
     await typeSlow(page, page.locator("#pw"), PASSWORD);
     await click(page, page.getByRole("button", { name: "Log in" }));
   }
-  await page.getByText("Run the shopping agent").waitFor({ timeout: 60_000 });
+  await page.getByRole("tab", { name: "Shopping agent" }).waitFor({ timeout: 60_000 });
   const reset = page.getByRole("button", { name: "Reset demo" });
   await reset.click();
   await page.waitForTimeout(800);
@@ -227,13 +247,64 @@ try {
   await wait(3500);
   await still(page, "07-paid");
 
-  // 6. Back to the dashboard: audit log
+  // 6. Merchant side: a support agent with PayPal's MCP tools, refunding the $79 payment just made
   await click(page, page.getByRole("link", { name: "Back to dashboard" }));
+  await page.getByText("Audit log").waitFor();
+  await click(page, page.getByRole("tab", { name: /Support agent/ }));
+  mark("support");
+  await wait(2500);
+
+  await runTicket(page, "Fair partial refund");
+  await scrollToEl(page, page.getByText("Refund check").first());
+  await wait(3500);
+  await still(page, "08-support-partial-refunded");
+
+  // Poisoned ticket: retry until the live model falls for the hidden $500 instruction (or tries run out)
+  let took = false;
+  for (let i = 1; i <= HIJACK_TRIES && !took; i++) {
+    await runTicket(page, "Poisoned support ticket");
+    took = (await page.getByText("The real model fell for the trap").count()) > 0;
+    mark(took ? "poisoned:FELL" : "poisoned:resisted", { attempt: i });
+  }
+  const tainted = page.getByText("Hidden text found").first();
+  if (await tainted.count()) {
+    await scrollToEl(page, tainted, 140);
+    await wait(3000);
+    await still(page, "09-poisoned-hidden-text");
+  }
+  await scrollToEl(page, page.getByText("Refund check").first());
+  await wait(4500);
+  await still(page, "10-poisoned-blocked");
+
+  // Full refund of what's left: over $50, so it waits for the owner
+  await runTicket(page, "Full refund, never arrived");
+  await scrollToEl(page, page.getByText("Refund check").first());
+  await wait(3000);
+  await still(page, "11-full-refund-held");
+  const reviewRefund = page.getByRole("link", { name: "Review request" });
+  if (await reviewRefund.count()) {
+    await scrollToEl(page, reviewRefund, 300);
+    await click(page, reviewRefund);
+    await page.getByText("Your support agent wants to refund").waitFor();
+    mark("approve-refund-page");
+    await wait(3000);
+    await still(page, "12-approve-refund");
+    await click(page, page.getByRole("button", { name: /Approve/ }));
+    await page.getByText("Refunded through PayPal ✓").waitFor({ timeout: 60_000 });
+    mark("refunded");
+    await wait(3500);
+    await still(page, "13-refunded");
+    await click(page, page.getByRole("link", { name: "Back to dashboard" }));
+  } else {
+    mark("full-refund:not-held", { note: "Under the $50 approval rule, so it refunded straight away" });
+  }
+
+  // 7. Audit log: purchases and refunds together
   await page.getByText("Audit log").waitFor();
   await scrollToEl(page, page.getByText("Audit log"), 120);
   mark("audit-log");
   await wait(4500);
-  await still(page, "08-audit-log");
+  await still(page, "14-audit-log");
   mark("end");
 } catch (err) {
   mark("error", { message: String(err?.message ?? err) });
