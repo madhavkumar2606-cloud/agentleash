@@ -8,7 +8,8 @@ import type { Policy } from "../types";
 export const DEFAULT_RULES =
   "Never spend more than $100 on one purchase. Keep total agent spending under $250 a week. " +
   "Ask me before anything over $60. No alcohol, gift cards, or gambling. Max 2 of any item. " +
-  "Check with me before paying a new seller.";
+  "Check with me before paying a new seller. " +
+  "Refunds over $50 need my approval. Never refund more than $200 at once or $300 a day.";
 
 export const DEFAULT_POLICY: Policy = {
   currency: "USD",
@@ -18,6 +19,9 @@ export const DEFAULT_POLICY: Policy = {
   blockedCategories: [],
   maxQuantity: 2,
   reviewNewMerchants: true,
+  refundApprovalThreshold: 50,
+  maxRefund: 200,
+  dailyRefundLimit: 300,
 };
 
 const num = (s: string | undefined) => (s ? Number(s.replace(/,/g, "")) : undefined);
@@ -55,6 +59,15 @@ export function heuristicParsePolicy(text: string): Policy {
   policy.blockedCategories = [...new Set(policy.blockedCategories)];
 
   policy.reviewNewMerchants = /new (?:seller|merchant|store|shop)/.test(t);
+
+  const refundAsk = t.match(new RegExp(String.raw`refunds? (?:over|above|of more than)\s*${AMT}\s*(?:need|needs|require|requires|must)`));
+  if (refundAsk) policy.refundApprovalThreshold = num(refundAsk[1])!;
+  const refundMax = t.match(new RegExp(String.raw`(?:never refund|refund no) more than\s*${AMT}`));
+  if (refundMax) policy.maxRefund = num(refundMax[1])!;
+  const refundDay =
+    t.match(new RegExp(String.raw`refund[^.]*?${AMT}\s*(?:a|per|each)\s*day`)) ??
+    t.match(new RegExp(String.raw`(?:or|and)\s*${AMT}\s*(?:a|per)\s*day`));
+  if (refundDay) policy.dailyRefundLimit = num(refundDay[1])!;
   return policy;
 }
 
@@ -65,6 +78,9 @@ const PolicySchema = z.object({
   blockedCategories: z.array(z.string()),
   maxQuantity: z.number().int().positive(),
   reviewNewMerchants: z.boolean(),
+  refundApprovalThreshold: z.number().nonnegative().default(DEFAULT_POLICY.refundApprovalThreshold),
+  maxRefund: z.number().positive().default(DEFAULT_POLICY.maxRefund),
+  dailyRefundLimit: z.number().positive().default(DEFAULT_POLICY.dailyRefundLimit),
 });
 
 export async function parsePolicy(text: string): Promise<{ policy: Policy; parsedBy: "llm" | "heuristic" }> {
@@ -75,7 +91,7 @@ export async function parsePolicy(text: string): Promise<{ policy: Policy; parse
       "Amounts are USD numbers. If a rule is not stated, use these defaults: " +
       JSON.stringify(DEFAULT_POLICY) +
       ". blockedCategories are short lowercase category names (e.g. \"alcohol\", \"gift cards\").",
-    `Rules:\n"""${text}"""\nReturn JSON with keys perTransactionLimit, weeklyLimit, approvalThreshold, blockedCategories, maxQuantity, reviewNewMerchants.`,
+    `Rules:\n"""${text}"""\nReturn JSON with keys perTransactionLimit, weeklyLimit, approvalThreshold, blockedCategories, maxQuantity, reviewNewMerchants, refundApprovalThreshold, maxRefund, dailyRefundLimit.`,
   );
   if (!llm) return { policy: heuristic, parsedBy: "heuristic" };
   // Safety floor: blocked categories found by either parser are kept.

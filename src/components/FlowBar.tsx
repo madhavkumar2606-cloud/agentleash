@@ -7,12 +7,13 @@ import { usd } from "./ui";
  */
 export function FlowBar({ verdict, payment, amount }: { verdict: Verdict; payment: PaymentStatus; amount: number }) {
   const held = verdict === "REVIEW" && (payment === "awaiting_owner" || payment === "rejected");
+  const ok = payment === "approved";
   const blocked = verdict === "BLOCK";
-  const paid = payment === "captured";
+  const paid = payment === "captured" || payment === "refunded";
 
   const link = blocked
     ? "bg-block"
-    : paid || payment === "awaiting_payer"
+    : paid || ok || payment === "awaiting_payer"
       ? "bg-allow"
       : held
         ? "bg-[repeating-linear-gradient(90deg,var(--color-review)_0_6px,transparent_6px_11px)]"
@@ -24,7 +25,11 @@ export function FlowBar({ verdict, payment, amount }: { verdict: Verdict; paymen
       ? `You declined. ${usd(amount)} stayed with you.`
       : held
         ? `Held at AgentLeash until you approve.`
-        : paid
+        : payment === "refunded"
+          ? `${usd(amount)} refunded through PayPal.`
+          : payment === "approved"
+            ? "Approved. The agent may run this call once."
+            : paid
           ? `${usd(amount)} paid through PayPal.`
           : payment === "awaiting_payer"
             ? `Cleared. ${usd(amount)} is waiting at PayPal checkout.`

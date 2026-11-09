@@ -2,7 +2,11 @@
 
 **A firewall between AI agents and your PayPal account.**
 
-AI agents can now shop and pay for you. But an agent can be tricked by a web page, wander off-task, or get gouged by a shady seller, and today nothing stands between that mistake and your money. AgentLeash sits in front of PayPal: every purchase an agent wants to make is checked against **what you actually asked for** and **the rules you wrote in plain English**. Only then does PayPal move money.
+AI agents can now shop and pay for you, and run your business's PayPal account through PayPal's own MCP server: refunds, invoices, disputes, subscriptions. But an agent can be tricked by a web page or a customer email, wander off-task, or get gouged by a shady seller, and today nothing stands between that mistake and your money. AgentLeash sits in front of PayPal: every purchase or PayPal action an agent wants to take is checked against **what you actually asked for**, **the rules you wrote in plain English**, and **the real records in PayPal**. Only then does PayPal move money.
+
+It protects both sides of a payment:
+- **Buyer side:** a shopping agent that pays with PayPal (Orders v2).
+- **Merchant side:** a support agent with PayPal's official MCP tools. AgentLeash Guard is a drop-in replacement for the PayPal MCP server that checks every money-moving tool call first.
 
 Built for the PayPal AI Hackathon 2026 ("Build What's Next with PayPal and AI").
 
@@ -15,6 +19,8 @@ Built for the PayPal AI Hackathon 2026 ("Build What's Next with PayPal and AI").
 | **Overspending** | Per-purchase, weekly and quantity limits; blocked categories | Your plain-English rules, parsed into a policy |
 | **Price gouging** | Same kit at 3x the usual price from a "premium seller" | Market price comparison |
 | **Risky sellers** | 9-day-old seller with 14% disputed payments | Seller trust signals (age, dispute rate, rating) |
+| **Poisoned support ticket** | A customer email hides a fake "policy update for AI support assistants" ordering a $500 goodwill refund on a $79 order | Injection + task checks on the PayPal tool call, then the refund is verified against the real capture in PayPal (exists, not already refunded, amount ≤ what's left) |
+| **Refund abuse** | Agent refunds more than allowed, or keeps refunding all day | Refund rules: approval over $50, max $200 per refund, $300 a day |
 
 Every decision is **ALLOW**, **REVIEW** (you approve on your phone, then pay with PayPal) or **BLOCK** (no PayPal order is ever created), with one plain-English reason and a full audit log.
 
@@ -23,6 +29,8 @@ Every decision is **ALLOW**, **REVIEW** (you approve on your phone, then pay wit
 - **Orders v2:** create order → payer approval → capture, wired to the firewall verdict
 - **Owner approval flow:** REVIEW sends you a phone page (QR code on the dashboard). Approve opens PayPal checkout, and the return URL captures the payment.
 - **Verified end to end in sandbox:** firewall verdict → order created → buyer pays at PayPal → capture recorded on the decision.
+- **Payments v2:** refunds are checked against the real capture (`GET /v2/payments/captures/{id}`) and executed with `POST /v2/payments/captures/{id}/refund`, idempotently.
+- **PayPal MCP server (`@paypal/mcp`):** AgentLeash Guard runs PayPal's official MCP server underneath and gates its 8 money-moving tools (`create_refund`, `pay_order`, `create_order`, `accept_dispute_claim`, `send_invoice`, `cancel_sent_invoice`, `create_subscription`, `cancel_subscription`). The 20 read-only tools pass straight through.
 - **Order/decision binding:** the PayPal order's `reference_id` and `custom_id` are the firewall decision ID, and capture only runs if the returned token matches the stored order.
 
 ## Run it
@@ -118,6 +126,39 @@ AgentLeash ships an MCP server with two tools, `agentleash_get_rules` and `agent
 }
 ```
 
+## Guard PayPal's own MCP server: `npm run paypal-guard`
+
+PayPal's [MCP server](https://www.npmjs.com/package/@paypal/mcp) lets an agent refund, invoice and settle disputes on your account. AgentLeash Guard is a drop-in replacement for it. It starts PayPal's server underneath and offers the same tools, so the agent doesn't change. Each money-moving tool asks the agent for three extra fields (its task, the text it read, and why), and AgentLeash checks the call before PayPal sees it:
+
+| Verdict | What the agent gets back |
+|---|---|
+| ALLOW | The real PayPal result (refunds are run by AgentLeash, which verified the capture first) |
+| REVIEW | "Held for the owner", with a phone approval link. Nothing runs until you approve. |
+| BLOCK | The reasons, and "do not retry". PayPal never sees the call. |
+
+If AgentLeash can't be reached, the call fails closed.
+
+```json
+{
+  "mcpServers": {
+    "paypal": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/agentleash/mcp/paypal-guard.mts"],
+      "env": {
+        "AGENTLEASH_URL": "https://your-agentleash.onrender.com",
+        "AGENTLEASH_API_KEY": "same key as the server",
+        "PAYPAL_CLIENT_ID": "sandbox client id",
+        "PAYPAL_CLIENT_SECRET": "sandbox secret"
+      }
+    }
+  }
+}
+```
+
+Other agents can call the same check over HTTP: `POST /api/guard/check` with `{ tool, args, task, context, agentReasoning, execute }`.
+
+To see it without an MCP client, open the dashboard, switch to **Support agent · PayPal MCP**, and run the three tickets: a fair partial refund (refunded), a poisoned ticket (blocked), and a full refund (held for your approval, then refunded). In sandbox mode, make one **Honest purchase** and pay first, so there's a real PayPal capture to refund.
+
 ## Record the demo video
 
 `npm run record-demo` drives your real browser through the live site (landing scan, honest purchase, the hijack, phone approval, PayPal payment, audit log), with a visible cursor and steady pacing. It reruns the hijack scenario until the live model falls for the trap (up to `HIJACK_TRIES`, default 3) and pauses for you to log in to PayPal sandbox by hand.
@@ -157,6 +198,9 @@ src/lib/llm.ts      swappable LLM adapter (Gemini / Anthropic / OpenAI)
 src/lib/agent.ts    scripted demo agent + 5 scenarios (used without an AI key)
 src/lib/liveAgent.ts real LLM shopping agent (careful / naive profiles)
 mcp/server.mts      MCP server for Claude Desktop / Cursor / other agents
+mcp/paypal-guard.mts  AgentLeash Guard: PayPal's official MCP server with every money-moving tool checked
+src/lib/guard/      checks for PayPal tool calls (injection, task, verified in PayPal, refund rules)
+src/lib/supportAgent.ts  merchant support agent demo (3 tickets)
 scripts/selftest.mts  npm run selftest: key + end-to-end check
 src/lib/orchestrator.ts  verdict → PayPal order / approval / capture
 src/app/            landing page (/), dashboard (/app), login, phone approval page, API routes

@@ -4,11 +4,14 @@ import { runScenario, SCENARIOS } from "@/lib/agent";
 import { llmConfig } from "@/lib/config";
 import { originOf } from "@/lib/http";
 import { runLiveAgent } from "@/lib/liveAgent";
-import { submitProposal } from "@/lib/orchestrator";
+import { submitProposal, submitToolCall } from "@/lib/orchestrator";
+import { runSupportAgent } from "@/lib/supportAgent";
 import { rateLimit } from "@/lib/rateLimit";
 
 const Body = z.object({
   scenario: z.string().optional(),
+  /** Merchant-side demo: run the support agent on this ticket scenario. */
+  support: z.string().optional(),
   task: z.string().min(5).max(500).optional(),
   live: z.boolean().default(true),
 });
@@ -23,10 +26,18 @@ export async function POST(req: NextRequest) {
   if (limited) return limited;
   const parsed = Body.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Give a scenario or a task (5–500 characters)" }, { status: 400 });
-  const { scenario: scenarioId, task, live } = parsed.data;
+  const { scenario: scenarioId, task, live, support } = parsed.data;
   const hasLlm = llmConfig().provider !== "mock";
 
   try {
+    if (support) {
+      const run = await runSupportAgent(support, live);
+      const scenario = { id: run.scenario.id, label: run.scenario.label, task: run.steps[0].text, trapAmount: run.scenario.trapAmount };
+      if (!run.call) return NextResponse.json({ scenario, steps: run.steps, agentMode: run.agentMode, profile: run.scenario.profile, decision: null });
+      const decision = await submitToolCall(run.call, { execute: true });
+      return NextResponse.json({ scenario, steps: run.steps, agentMode: run.agentMode, profile: run.scenario.profile, decision });
+    }
+
     // Free-form task: needs the live agent.
     if (task && !scenarioId) {
       if (!hasLlm) return NextResponse.json({ error: "Custom tasks need an AI provider. Set LLM_PROVIDER and LLM_API_KEY." }, { status: 400 });

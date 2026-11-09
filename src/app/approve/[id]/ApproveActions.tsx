@@ -4,22 +4,32 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PayPalMark, usd } from "@/components/ui";
 
-export default function ApproveActions({ id, amount }: { id: string; amount: number }) {
+export default function ApproveActions({
+  id,
+  amount,
+  kind = "purchase",
+}: {
+  id: string;
+  amount: number;
+  kind?: "purchase" | "refund" | "tool";
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState<"approve" | "reject">();
   const [error, setError] = useState<string>();
 
-  async function act(kind: "approve" | "reject") {
-    setBusy(kind);
+  async function act(action: "approve" | "reject") {
+    setBusy(action);
     setError(undefined);
     try {
-      const res = await fetch(`/api/decisions/${id}/${kind}`, { method: "POST" });
+      const res = await fetch(`/api/decisions/${id}/${action}`, { method: "POST" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Something went wrong");
-      if (kind === "approve") {
-        if (!body.redirect) throw new Error(body.decision?.payment?.error ?? "PayPal didn't return a checkout link");
+      if (action === "approve" && body.redirect) {
         window.location.href = body.redirect;
         return;
+      }
+      if (action === "approve" && body.decision?.payment?.status === "failed") {
+        throw new Error(body.decision.payment.error ?? "PayPal didn't complete it");
       }
       router.refresh();
     } catch (e) {
@@ -36,7 +46,13 @@ export default function ApproveActions({ id, amount }: { id: string; amount: num
         disabled={!!busy}
         className="block w-full rounded-xl bg-[#ffc439] px-4 py-3.5 text-center font-semibold text-ink disabled:opacity-60"
       >
-        {busy === "approve" ? "Opening PayPal…" : (
+        {busy === "approve" ? (kind === "purchase" ? "Opening PayPal…" : "Approving…") : kind === "refund" ? (
+          <>
+            Approve {usd(amount)} refund via <PayPalMark />
+          </>
+        ) : kind === "tool" ? (
+          "Approve this PayPal action"
+        ) : (
           <>
             Approve {usd(amount)} and pay with <PayPalMark />
           </>

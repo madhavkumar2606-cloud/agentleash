@@ -74,6 +74,9 @@ const ICON_TONE: Record<string, string> = {
   drift: "bg-review-bg text-review",
   gouged: "bg-review-bg text-review",
   bigticket: "bg-[#e6eefb] text-pp-light",
+  partial: "bg-allow-bg text-allow",
+  poisoned: "bg-block-bg text-block",
+  full: "bg-[#e6eefb] text-pp-light",
 };
 
 /** One small pictogram per scenario: what kind of trouble it is. */
@@ -117,10 +120,21 @@ export function ScenarioIcon({ id }: { id: string }) {
       </>
     ),
   };
+  // support-agent tickets reuse the same pictograms
+  const alias: Record<string, string> = { partial: "clean", poisoned: "injection", full: "bigticket" };
+  const key = paths[id] ? id : alias[id];
+  if (id === "full") {
+    paths.full = (
+      <>
+        <path {...p} d="M3 7l9-4 9 4v10l-9 4-9-4V7z" />
+        <path {...p} d="M3 7l9 4 9-4M12 11v10" />
+      </>
+    );
+  }
   return (
     <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${ICON_TONE[id] ?? "bg-line text-ink"}`} aria-hidden>
       <svg width="20" height="20" viewBox="0 0 24 24">
-        {paths[id] ?? paths.clean}
+        {paths[id] ?? paths[key] ?? paths.clean}
       </svg>
     </span>
   );

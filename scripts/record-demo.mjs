@@ -91,7 +91,8 @@ async function smoothScroll(page, toY, ms = 1500) {
           const k = Math.min(1, (now - t) / d);
           const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
           window.scrollTo(0, start + (y - start) * e);
-          k < 1 ? requestAnimationFrame(step) : res();
+          if (k < 1) requestAnimationFrame(step);
+          else res();
         };
         requestAnimationFrame(step);
       }),

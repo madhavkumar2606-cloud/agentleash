@@ -17,24 +17,34 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
 
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 pb-16 pt-8">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">AgentLeash · purchase request</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted">AgentLeash · approval request</p>
       <h1 className="mt-2 text-2xl font-semibold leading-tight tracking-tight">
-        Your agent wants to spend <span className="tabular-nums">{usd(d.amount)}</span>
+        {d.toolCall?.tool === "create_refund" ? (
+          <>
+            Your support agent wants to refund <span className="tabular-nums">{usd(d.amount)}</span>
+          </>
+        ) : d.toolCall ? (
+          <>Your agent wants to run {d.toolCall.tool.replace(/_/g, " ")}</>
+        ) : (
+          <>
+            Your agent wants to spend <span className="tabular-nums">{usd(d.amount)}</span>
+          </>
+        )}
       </h1>
 
       <section className="receipt-shadow mt-5">
         <div className="receipt px-5 pb-7 pt-7">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold">Purchase check</p>
+            <p className="text-sm font-semibold">{d.toolCall ? (d.toolCall.tool === "create_refund" ? "Refund check" : "PayPal action check") : "Purchase check"}</p>
             <p className="font-mono text-xs text-muted">#{d.id.slice(4, 12)} · risk {d.riskScore}/100</p>
           </div>
           <div className="-rotate-[8deg]">
-            <Stamp verdict={d.payment.status === "captured" ? "ALLOW" : d.verdict} />
+            <Stamp verdict={d.payment.status === "captured" || d.payment.status === "refunded" || d.payment.status === "approved" ? "ALLOW" : d.verdict} />
           </div>
         </div>
         <hr className="my-4 border-t-2 border-dashed border-line" />
-        <PriceLine left={`${p.quantity} × ${p.title}`} right={usd(d.amount)} />
+        <PriceLine left={d.toolCall ? p.title : `${p.quantity} × ${p.title}`} right={usd(d.amount)} />
         <p className="text-sm text-muted">{p.merchantName}</p>
         <dl className="mt-4 space-y-3 text-sm">
           <div>
@@ -42,7 +52,7 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
             <dd>{p.task}</dd>
           </div>
           <div>
-            <dt className="text-xs text-muted">Why the agent picked it</dt>
+            <dt className="text-xs text-muted">Why the agent chose this</dt>
             <dd>{p.agentReasoning}</dd>
           </div>
         </dl>
@@ -66,7 +76,17 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
 
       <section className="mt-6">
         {d.verdict === "REVIEW" && d.payment.status === "awaiting_owner" ? (
-          <ApproveActions id={d.id} amount={d.amount} />
+          <ApproveActions id={d.id} amount={d.amount} kind={d.toolCall ? (d.toolCall.tool === "create_refund" ? "refund" : "tool") : "purchase"} />
+        ) : d.payment.status === "refunded" ? (
+          <div className="rounded-xl bg-allow-bg p-5 text-allow">
+            <p className="text-lg font-semibold">Refunded through PayPal ✓</p>
+            <p className="mt-1 font-mono text-xs">Refund {d.payment.refundId}</p>
+          </div>
+        ) : d.payment.status === "approved" ? (
+          <div className="rounded-xl bg-allow-bg p-5 text-allow">
+            <p className="text-lg font-semibold">Approved ✓</p>
+            <p className="mt-1 text-sm">The agent may now run this PayPal call once.</p>
+          </div>
         ) : d.payment.status === "captured" ? (
           <div className="rounded-xl bg-allow-bg p-5 text-allow">
             <p className="text-lg font-semibold">Paid with PayPal ✓</p>

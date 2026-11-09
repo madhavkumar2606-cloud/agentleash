@@ -122,3 +122,63 @@ export async function captureOrder(
   const capture = data?.purchase_units?.[0]?.payments?.captures?.[0];
   return { captureId: capture?.id ?? "", status: data.status, amount: capture?.amount?.value, currency: capture?.amount?.currency_code };
 }
+
+// ---- Captures and refunds (used to verify and execute agent refunds) ----
+
+export interface CaptureInfo {
+  id: string;
+  status: string; // COMPLETED | PARTIALLY_REFUNDED | REFUNDED | PENDING | DECLINED
+  amount: number;
+  currency: string;
+}
+
+/** Mock-mode registry of captures, filled when demo purchases are paid. */
+const g = globalThis as unknown as { __mockCaptures?: Map<string, CaptureInfo> };
+const mockCaptures = () => (g.__mockCaptures ??= new Map());
+export function registerMockCapture(c: CaptureInfo) {
+  mockCaptures().set(c.id, c);
+}
+
+/** Look up a capture in PayPal. Returns null if PayPal says it doesn't exist. */
+export async function getCapture(captureId: string): Promise<CaptureInfo | null> {
+  const cfg = paypalConfig();
+  if (cfg.mode === "mock") return mockCaptures().get(captureId) ?? null;
+  const res = await fetch(`${cfg.baseUrl}/v2/payments/captures/${encodeURIComponent(captureId)}`, {
+    headers: { Authorization: `Bearer ${await accessToken()}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`PayPal capture lookup failed (${res.status}): ${await res.text()}`);
+  const d = await res.json();
+  return { id: d.id, status: d.status, amount: Number(d.amount?.value ?? 0), currency: d.amount?.currency_code ?? "USD" };
+}
+
+/** Refund a capture (full or partial). Idempotent per requestId. */
+export async function refundCapture(
+  captureId: string,
+  amount: number,
+  currency: string,
+  note: string,
+  requestId: string,
+): Promise<{ refundId: string; status: string }> {
+  const cfg = paypalConfig();
+  if (cfg.mode === "mock") {
+    const c = mockCaptures().get(captureId);
+    if (c) c.status = amount >= c.amount ? "REFUNDED" : "PARTIALLY_REFUNDED";
+    return { refundId: "MOCKREF-" + Math.random().toString(36).slice(2, 10).toUpperCase(), status: "COMPLETED" };
+  }
+  const res = await fetch(`${cfg.baseUrl}/v2/payments/captures/${encodeURIComponent(captureId)}/refund`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${await accessToken()}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": requestId,
+    },
+    body: JSON.stringify({
+      amount: { value: amount.toFixed(2), currency_code: currency },
+      note_to_payer: note.slice(0, 255),
+    }),
+  });
+  if (!res.ok) throw new Error(`PayPal refund failed (${res.status}): ${await res.text()}`);
+  const d = await res.json();
+  return { refundId: d.id, status: d.status };
+}

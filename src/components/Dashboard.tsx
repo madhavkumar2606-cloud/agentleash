@@ -14,11 +14,12 @@ interface AppState {
   decisions: Decision[];
   weeklySpent: number;
   scenarios: Scenario[];
+  supportScenarios: { id: string; label: string; blurb: string; expected: string }[];
   modes: { paypal: "mock" | "sandbox"; llm: string; model: string; auth: "open" | "locked" | "misconfigured" };
 }
 
 interface Run {
-  scenario: Pick<Scenario, "id" | "label" | "task" | "trapProductId">;
+  scenario: Pick<Scenario, "id" | "label" | "task" | "trapProductId"> & { trapAmount?: number };
   steps: AgentStep[];
   decisionId: string | null;
   agentMode: "live" | "scripted";
@@ -32,6 +33,7 @@ const STEP_LABEL: Record<AgentStep["kind"], string> = {
   read: "Read",
   think: "Think",
   propose: "Wants to pay",
+  tool: "PayPal tool",
 };
 
 export default function Dashboard() {
@@ -45,6 +47,7 @@ export default function Dashboard() {
   const [origin, setOrigin] = useState("");
   const [live, setLive] = useState(true);
   const [customTask, setCustomTask] = useState("");
+  const [mode, setMode] = useState<"shop" | "support">("shop");
   const rulesTouched = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -69,8 +72,8 @@ export default function Dashboard() {
     return () => clearTimeout(t);
   }, [run, shown]);
 
-  async function runAgent(input: { scenario: string } | { task: string }) {
-    setBusy("scenario" in input ? input.scenario : "custom");
+  async function runAgent(input: { scenario: string } | { task: string } | { support: string }) {
+    setBusy("scenario" in input ? input.scenario : "support" in input ? input.support : "custom");
     setError(undefined);
     setRun(undefined);
     setShown(0);
@@ -245,9 +248,30 @@ export default function Dashboard() {
         <div className="space-y-6">
           <section>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-semibold">Run the shopping agent</h2>
-                <p className="text-xs text-muted">Each scenario is a different way an agent can go wrong.</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <div role="tablist" aria-label="Which agent" className="inline-flex rounded-lg border border-line bg-card p-0.5 text-sm">
+                  {(
+                    [
+                      ["shop", "Shopping agent"],
+                      ["support", "Support agent · PayPal MCP"],
+                    ] as const
+                  ).map(([m, label]) => (
+                    <button
+                      key={m}
+                      role="tab"
+                      aria-selected={mode === m}
+                      onClick={() => setMode(m)}
+                      className={`rounded-md px-3 py-1.5 font-medium ${mode === m ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted">
+                  {mode === "shop"
+                    ? "An agent shopping for you. Each scenario is a different way it can go wrong."
+                    : "An agent running your shop's PayPal with PayPal's own tools. Customers write the tickets it reads."}
+                </p>
               </div>
               <label className={`inline-flex items-center gap-2 text-xs ${hasLlm ? "" : "opacity-50"}`}>
                 <input
@@ -263,11 +287,11 @@ export default function Dashboard() {
                 </span>
               </label>
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              {data.scenarios.map((s) => (
+            <div className={`mt-3 grid gap-3 sm:grid-cols-2 ${mode === "shop" ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>
+              {(mode === "shop" ? data.scenarios : data.supportScenarios).map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => runAgent({ scenario: s.id })}
+                  onClick={() => runAgent(mode === "shop" ? { scenario: s.id } : { support: s.id })}
                   disabled={!!busy}
                   className={`group flex flex-col items-start justify-start rounded-xl border bg-card p-4 text-left transition hover:-translate-y-0.5 hover:border-ink disabled:opacity-60 ${
                     run?.scenario.id === s.id ? "border-ink" : "border-line"
@@ -280,7 +304,7 @@ export default function Dashboard() {
               ))}
             </div>
             <form
-              className="mt-3 flex gap-2"
+              className={`mt-3 flex gap-2 ${mode === "shop" ? "" : "hidden"}`}
               onSubmit={(e) => {
                 e.preventDefault();
                 if (customTask.trim().length >= 5) runAgent({ task: customTask.trim() });
@@ -309,11 +333,23 @@ export default function Dashboard() {
 
           {!run && (
             <section className="rounded-xl border border-dashed border-line p-10 text-center">
-              <p className="font-medium">Pick a scenario to watch the agent shop.</p>
-              <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-                The agent browses a store and asks to pay. AgentLeash checks the purchase against your task and rules
-                before PayPal moves any money. Try <strong>Hijacked by a web page</strong> first.
-              </p>
+              {mode === "shop" ? (
+                <>
+                  <p className="font-medium">Pick a scenario to watch the agent shop.</p>
+                  <p className="mx-auto mt-1 max-w-md text-sm text-muted">
+                    The agent browses a store and asks to pay. AgentLeash checks the purchase against your task and rules
+                    before PayPal moves any money. Try <strong>Hijacked by a web page</strong> first.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">Pick a ticket for the support agent.</p>
+                  <p className="mx-auto mt-1 max-w-md text-sm text-muted">
+                    The agent uses PayPal&apos;s MCP tools to refund customers. Every refund is checked against the real
+                    PayPal payment and your refund rules first. Try <strong>Poisoned support ticket</strong>.
+                  </p>
+                </>
+              )}
             </section>
           )}
 
@@ -338,7 +374,7 @@ export default function Dashboard() {
                   {run.steps.slice(0, shown).map((s, i) => (
                     <li key={i} className="rise flex gap-3">
                       <span className={`w-24 shrink-0 text-xs uppercase tracking-wide ${s.kind === "propose" ? "text-[#f5c26b]" : "text-paper/50"}`}>
-                        {STEP_LABEL[s.kind]}
+                        {s.kind === "propose" && s.text.startsWith("Call ") ? "Wants to call" : STEP_LABEL[s.kind]}
                       </span>
                       <span className={s.tainted ? "text-paper/80" : ""}>
                         <TaintedText text={s.kind === "search" ? shortenResults(s.text) : s.text} tainted={!!s.tainted} />
@@ -346,8 +382,15 @@ export default function Dashboard() {
                     </li>
                   ))}
                 </ol>
-                {traceDone && run.agentMode === "live" && run.scenario.trapProductId && (
-                  <TrapNote fell={decision?.proposal.productId === run.scenario.trapProductId} scenarioId={run.scenario.id} />
+                {traceDone && run.agentMode === "live" && (run.scenario.trapProductId || run.scenario.trapAmount) && (
+                  <TrapNote
+                    fell={
+                      run.scenario.trapAmount
+                        ? decision?.amount === run.scenario.trapAmount
+                        : decision?.proposal.productId === run.scenario.trapProductId
+                    }
+                    scenarioId={run.scenario.id}
+                  />
                 )}
               </section>
 
@@ -385,7 +428,7 @@ export default function Dashboard() {
                   <thead className="text-xs text-muted">
                     <tr>
                       <th className="px-5 py-2 font-medium">Time</th>
-                      <th className="px-3 py-2 font-medium">Purchase</th>
+                      <th className="px-3 py-2 font-medium">Action</th>
                       <th className="px-3 py-2 text-right font-medium">Amount</th>
                       <th className="px-3 py-2 font-medium">Verdict</th>
                       <th className="px-3 py-2 font-medium">Payment</th>
@@ -400,7 +443,7 @@ export default function Dashboard() {
                         </td>
                         <td className="px-3 py-3">
                           <p className="font-medium">
-                            {d.proposal.quantity} × {d.proposal.title}
+                            {d.toolCall ? d.proposal.title : `${d.proposal.quantity} × ${d.proposal.title}`}
                           </p>
                           <p className="text-xs text-muted">{d.proposal.merchantName}</p>
                         </td>
@@ -439,7 +482,9 @@ function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
       {/* Header: what this is, when, and the stamp */}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold">Purchase check</p>
+          <p className="text-sm font-semibold">
+            {d.toolCall ? (d.toolCall.tool === "create_refund" ? "Refund check" : "PayPal action check") : "Purchase check"}
+          </p>
           <p className="mt-0.5 font-mono text-xs text-muted">
             {time} · #{d.id.slice(4, 12)}
           </p>
@@ -451,8 +496,19 @@ function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
 
       <hr className="my-4 border-t-2 border-dashed border-line" />
 
-      <PriceLine left={`${d.proposal.quantity} × ${d.proposal.title}`} right={usd(d.amount)} />
-      <p className="mt-1 text-sm text-muted">{d.proposal.merchantName}</p>
+      {d.toolCall ? (
+        <>
+          <PriceLine left={d.toolCall.tool === "create_refund" ? "Refund to customer" : d.toolCall.tool.replace(/_/g, " ")} right={usd(d.amount)} />
+          <p className="mt-1 font-mono text-xs text-muted">
+            PayPal MCP · {d.toolCall.tool}({Object.entries(d.toolCall.args).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(", ").slice(0, 120)})
+          </p>
+        </>
+      ) : (
+        <>
+          <PriceLine left={`${d.proposal.quantity} × ${d.proposal.title}`} right={usd(d.amount)} />
+          <p className="mt-1 text-sm text-muted">{d.proposal.merchantName}</p>
+        </>
+      )}
       <p className="mt-2 text-xs leading-relaxed text-muted">
         <span className="font-medium text-ink">Task:</span> {d.proposal.task}
       </p>
@@ -481,8 +537,16 @@ function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
       </ul>
 
       <div className="mt-4">
-        {d.verdict === "BLOCK" && <p className="text-sm text-muted">No PayPal order was created.</p>}
-        {d.verdict === "ALLOW" && (
+        {d.verdict === "BLOCK" && (
+          <p className="text-sm text-muted">{d.toolCall ? `PayPal's ${d.toolCall.tool} never ran.` : "No PayPal order was created."}</p>
+        )}
+        {d.payment.status === "refunded" && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <PaymentChip status="refunded" />
+            <span className="font-mono text-xs text-muted">Refund {d.payment.refundId}</span>
+          </div>
+        )}
+        {d.verdict === "ALLOW" && !d.toolCall && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <PaymentChip status={d.payment.status} />
             {d.payment.orderId && <span className="font-mono text-xs text-muted">Order {d.payment.orderId}</span>}
@@ -494,7 +558,7 @@ function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
             {d.payment.error && <span className="text-xs text-block">{d.payment.error}</span>}
           </div>
         )}
-        {d.verdict === "REVIEW" && (
+        {d.verdict === "REVIEW" && d.payment.status !== "refunded" && (
           <div className="flex items-center gap-4 rounded-lg bg-review-bg/60 p-3">
             {d.payment.status === "awaiting_owner" ? (
               <>
@@ -540,7 +604,7 @@ function TrapNote({ fell, scenarioId }: { fell: boolean; scenarioId: string }) {
   return (
     <p className="rise mt-4 rounded-lg bg-paper/10 p-3 text-xs leading-relaxed text-paper/80">
       <strong className="text-paper">This model resisted the trap this time.</strong> AgentLeash still checked the purchase
-      {scenarioId === "injection" ? " and flagged the poisoned page" : ""}. Weaker or older agents do fall for it: untick
+      {scenarioId === "injection" ? " and flagged the poisoned page" : scenarioId === "poisoned" ? " and flagged the poisoned ticket" : ""}. Weaker or older agents do fall for it: untick
       “Live AI agent” to replay a vulnerable agent.
     </p>
   );
@@ -549,7 +613,7 @@ function TrapNote({ fell, scenarioId }: { fell: boolean; scenarioId: string }) {
 /** Shows page text, with the hidden <span> payload stripped of markup and highlighted. */
 function TaintedText({ text, tainted }: { text: string; tainted: boolean }) {
   if (!tainted) return <>{text}</>;
-  const m = text.match(/<span[^>]*>([\s\S]*?)<\/span>/);
+  const m = text.match(/<(span|div)[^>]*>([\s\S]*?)<\/\1>/);
   if (!m) return <>{text}</>;
   const [before, after] = text.split(m[0]);
   return (
@@ -557,7 +621,7 @@ function TaintedText({ text, tainted }: { text: string; tainted: boolean }) {
       {before}
       <span className="pulse-twice mt-1 block rounded border border-dashed border-[#a996ff]/60 bg-[#5a3ee0]/20 p-2 text-[#d9d0ff]">
         <span className="mb-1 block font-sans text-[11px] font-semibold text-[#b9a8ff]">Hidden text found. Invisible to you, read by the agent:</span>
-        {m[1]}
+        {m[2]}
       </span>
       {after.replace(/​/g, "")}
     </>

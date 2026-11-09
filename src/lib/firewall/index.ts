@@ -134,11 +134,11 @@ export function checkPrice(p: PurchaseProposal): CheckResult {
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // Order in which failures are explained in the one-line summary (most important first).
-const PRIORITY: CheckResult["id"][] = ["injection", "intent", "policy", "price", "merchant", "budget"];
+const PRIORITY: CheckResult["id"][] = ["injection", "intent", "paypal", "refund", "policy", "price", "merchant", "budget"];
 
 export function decide(
   checks: CheckResult[],
-  p?: Pick<PurchaseProposal, "title" | "quantity">,
+  p?: Pick<PurchaseProposal, "title" | "quantity"> & { action?: string },
 ): { verdict: Verdict; riskScore: number; summary: string } {
   const sorted = [...checks].sort((a, b) => PRIORITY.indexOf(a.id) - PRIORITY.indexOf(b.id));
   const fails = sorted.filter((c) => c.status === "fail");
@@ -150,7 +150,9 @@ export function decide(
   if (fails.length) {
     const summary =
       fails[0].id === "injection"
-        ? `Blocked: a web page hijacked the agent with hidden instructions. It tried to buy ${p ? `${p.quantity} × ${p.title}` : "something else"} instead of doing your task.`
+        ? p?.action
+          ? `Blocked: hidden instructions in a message hijacked the agent. It tried to ${p.action} instead of doing its task.`
+          : `Blocked: a web page hijacked the agent with hidden instructions. It tried to buy ${p ? `${p.quantity} × ${p.title}` : "something else"} instead of doing your task.`
         : "Blocked: " + fails[0].detail;
     return { verdict: "BLOCK", riskScore: Math.max(risk, 60), summary };
   }

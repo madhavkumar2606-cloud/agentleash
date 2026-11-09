@@ -5,9 +5,10 @@
 
 import { paypalConfig } from "./config";
 import { evaluate } from "./firewall";
-import { captureOrder, createOrder } from "./paypal";
+import { evaluateToolCall } from "./guard";
+import { captureOrder, createOrder, refundCapture, registerMockCapture } from "./paypal";
 import { getDecision, newId, saveDecision, state, weeklySpent } from "./store";
-import type { Decision, PurchaseProposal } from "./types";
+import type { Decision, PurchaseProposal, ToolCallProposal } from "./types";
 
 export async function submitProposal(p: PurchaseProposal, origin: string): Promise<Decision> {
   const s = state();
@@ -51,7 +52,76 @@ export async function ownerApprove(id: string, origin: string): Promise<Decision
   const d = getDecision(id);
   if (!d) throw new Error("Decision not found");
   if (d.verdict !== "REVIEW" || d.payment.status !== "awaiting_owner") return d;
+  if (d.toolCall) {
+    // Refunds AgentLeash runs itself. Other PayPal tools: the owner's approval lets the agent's next identical call through.
+    if (d.toolCall.tool === "create_refund") return executeRefund(d);
+    d.payment = { status: "approved" };
+    return saveDecision(d);
+  }
   return startPayment(d, origin, { autoCapture: false });
+}
+
+// ---------- PayPal MCP tool calls ----------
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/** Agent refunds actually executed in the last 24 hours. */
+export function refundedToday(now = Date.now()): number {
+  return state()
+    .decisions.filter((d) => d.toolCall?.tool === "create_refund" && d.payment.status === "refunded" && Date.parse(d.updatedAt) >= now - DAY)
+    .reduce((s, d) => s + d.amount, 0);
+}
+
+/** Total already refunded by agents on one capture (PayPal's capture lookup doesn't return it). */
+export function refundedOnCapture(captureId: string): number {
+  return state()
+    .decisions.filter((d) => d.toolCall?.tool === "create_refund" && d.payment.status === "refunded" && d.toolCall.args.capture_id === captureId)
+    .reduce((s, d) => s + d.amount, 0);
+}
+
+const fingerprint = (tool: string, args: Record<string, unknown>) => JSON.stringify([tool, args]);
+
+/**
+ * Check a PayPal tool call. If an identical call was approved by the owner and not yet used, it goes straight through.
+ * With execute=true, allowed refunds are executed by AgentLeash (it holds the PayPal keys).
+ */
+export async function submitToolCall(tc: ToolCallProposal, opts: { execute: boolean }): Promise<Decision> {
+  const s = state();
+  const fp = fingerprint(tc.tool, tc.args);
+  const preApproved = s.decisions.find((d) => d.toolCall && d.payment.status === "approved" && fingerprint(d.toolCall.tool, d.toolCall.args) === fp);
+  if (preApproved) {
+    preApproved.payment = { status: "none" }; // consumed: the agent may now run it once
+    preApproved.verdict = "ALLOW";
+    preApproved.summary = "Approved by you. The agent may now run this call once.";
+    return saveDecision(preApproved);
+  }
+  const d = await evaluateToolCall(tc, {
+    policy: s.mandate.policy,
+    refundedToday: refundedToday(),
+    refundedOnCapture,
+    mandateId: s.mandate.id,
+    id: newId("dec"),
+  });
+  saveDecision(d);
+  if (d.verdict === "ALLOW" && opts.execute && tc.tool === "create_refund") await executeRefund(d);
+  return d;
+}
+
+async function executeRefund(d: Decision): Promise<Decision> {
+  const args = d.toolCall!.args;
+  try {
+    const r = await refundCapture(
+      String(args.capture_id),
+      d.amount,
+      d.proposal.currency,
+      String(args.note_to_payer ?? "Refund issued by your support agent, checked by AgentLeash."),
+      d.id,
+    );
+    d.payment = { status: "refunded", refundId: r.refundId };
+  } catch (err) {
+    d.payment = { status: "failed", error: (err as Error).message };
+  }
+  return saveDecision(d);
 }
 
 export function ownerReject(id: string): Decision {
@@ -77,6 +147,9 @@ export async function completeCapture(id: string): Promise<Decision> {
     }
     d.payment = { ...d.payment, status: "captured", captureId: cap.captureId };
     state().knownMerchants.add(d.proposal.merchantId);
+    if (paypalConfig().mode === "mock") {
+      registerMockCapture({ id: cap.captureId, status: "COMPLETED", amount: d.amount, currency: d.proposal.currency });
+    }
   } catch (err) {
     d.payment = { ...d.payment, status: "failed", error: (err as Error).message };
   }

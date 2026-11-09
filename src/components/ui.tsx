@@ -50,13 +50,15 @@ export const PAYMENT_TEXT: Record<PaymentStatus, string> = {
   awaiting_owner: "Waiting for your approval",
   awaiting_payer: "Waiting for PayPal checkout",
   captured: "Paid via PayPal",
+  refunded: "Refunded via PayPal",
+  approved: "Approved: agent may proceed",
   rejected: "Declined",
   failed: "Payment failed",
 };
 
 export function PaymentChip({ status }: { status: PaymentStatus }) {
   const cls =
-    status === "captured"
+    status === "captured" || status === "refunded"
       ? "text-pp bg-[#e6eefb]"
       : status === "failed" || status === "rejected"
         ? "text-muted bg-line/60"
