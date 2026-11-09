@@ -83,7 +83,7 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
         )}
       </section>
 
-      <Link href="/" className="mt-8 inline-block text-sm text-muted underline underline-offset-2">
+      <Link href="/app" className="mt-8 inline-block text-sm text-muted underline underline-offset-2">
         Back to dashboard
       </Link>
     </main>

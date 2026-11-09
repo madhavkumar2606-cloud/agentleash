@@ -10,8 +10,8 @@ function LoginForm() {
   const [busy, setBusy] = useState(false);
 
   // Only allow redirects back into this app.
-  const raw = params.get("next") ?? "/";
-  const next = raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\") ? raw : "/";
+  const raw = params.get("next") ?? "/app";
+  const next = raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\") ? raw : "/app";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

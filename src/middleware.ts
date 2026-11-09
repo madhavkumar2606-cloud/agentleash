@@ -1,5 +1,5 @@
-// Protects the owner's dashboard, rules, approvals and agent runs.
-// Public on purpose: /login, /api/login, PayPal return/cancel (verified by order token),
+// Protects the owner's dashboard (/app), rules, approvals and agent runs.
+// Public on purpose: the landing page (/), /login, /api/login, PayPal return/cancel (verified by order token),
 // /api/firewall/check (has its own API key), and /mock-paypal (disabled in sandbox mode).
 
 import { NextRequest, NextResponse } from "next/server";
@@ -27,5 +27,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/approve/:path*", "/api/state", "/api/mandate", "/api/reset", "/api/agent/:path*", "/api/decisions/:path*"],
+  matcher: ["/app", "/app/:path*", "/approve/:path*", "/api/state", "/api/mandate", "/api/reset", "/api/agent/:path*", "/api/decisions/:path*"],
 };

@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Scenario } from "@/lib/agent";
 import type { AgentStep, Decision, Mandate } from "@/lib/types";
+import { FlowBar } from "./FlowBar";
 import { QrCode } from "./QrCode";
 import { CheckPill, PaymentChip, PayPalMark, usd, VerdictBadge } from "./ui";
 
@@ -136,7 +138,7 @@ export default function Dashboard() {
     <main className="mx-auto max-w-7xl px-5 pb-20 pt-6 sm:px-8">
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-5">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3 rounded-md">
           <Logo />
           <div>
             <h1 className="text-xl font-semibold tracking-tight">AgentLeash</h1>
@@ -144,7 +146,7 @@ export default function Dashboard() {
               A firewall between your AI agents and your <PayPalMark /> account.
             </p>
           </div>
-        </div>
+        </Link>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <ModeBadge label="PayPal" value={data.modes.paypal === "sandbox" ? "Sandbox" : "Mock"} live={data.modes.paypal === "sandbox"} />
           <ModeBadge label="AI checks" value={data.modes.llm === "mock" ? "Heuristic" : data.modes.model} live={data.modes.llm !== "mock"} />
@@ -344,7 +346,7 @@ export default function Dashboard() {
                         {STEP_LABEL[s.kind]}
                       </span>
                       <span className={s.tainted ? "rounded bg-block/25 px-1.5 py-0.5 text-[#ffb4a9]" : ""}>
-                        <TaintedText text={s.text} tainted={!!s.tainted} />
+                        <TaintedText text={s.kind === "search" ? shortenResults(s.text) : s.text} tainted={!!s.tainted} />
                       </span>
                     </li>
                   ))}
@@ -454,6 +456,8 @@ function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
         {d.proposal.quantity} × {d.proposal.title} · {d.proposal.merchantName} · <span className="tabular-nums">{usd(d.amount)}</span>
       </p>
 
+      <FlowBar verdict={d.verdict} payment={d.payment.status} amount={d.amount} />
+
       <ul className="mt-4 divide-y divide-line border-y border-line">
         {d.checks.map((c) => (
           <li key={c.id} className="flex gap-3 py-2.5">
@@ -470,11 +474,7 @@ function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
       </ul>
 
       <div className="mt-4">
-        {d.verdict === "BLOCK" && (
-          <p className="text-sm text-muted">
-            No PayPal order was created. <span className="font-medium text-ink">{usd(d.amount)}</span> never left your account.
-          </p>
-        )}
+        {d.verdict === "BLOCK" && <p className="text-sm text-muted">No PayPal order was created.</p>}
         {d.verdict === "ALLOW" && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <PaymentChip status={d.payment.status} />
@@ -513,6 +513,14 @@ function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
   );
 }
 
+/** "Searched … → a · b · c · d · e" becomes "… → a · b · c (+2 more)" so the trace stays short. */
+function shortenResults(text: string): string {
+  const [head, list] = text.split(" → ");
+  if (!list) return text;
+  const items = list.split(" · ");
+  return items.length <= 3 ? text : `${head} → ${items.slice(0, 3).join(" · ")} (+${items.length - 3} more)`;
+}
+
 /** Says honestly whether the live model fell for this scenario's trap. */
 function TrapNote({ fell, scenarioId }: { fell: boolean; scenarioId: string }) {
   if (fell) {
@@ -540,7 +548,7 @@ function TaintedText({ text, tainted }: { text: string; tainted: boolean }) {
   return (
     <>
       {before}
-      <span className="mt-1 block rounded border border-[#ffb4a9]/40 p-2 text-[#ffd7d0]">
+      <span className="pulse-twice mt-1 block rounded border border-[#ffb4a9]/40 p-2 text-[#ffd7d0]">
         <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#ff8a7a]">Hidden on page (invisible to humans)</span>
         {m[1]}
       </span>

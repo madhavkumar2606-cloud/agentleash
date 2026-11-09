@@ -34,7 +34,7 @@ npm run dev                  # http://localhost:3000
 npm test                     # firewall tests
 ```
 
-Open the dashboard and click **Hijacked by a web page** first.
+Open http://localhost:3000 for the landing page, or go straight to the dashboard at **/app** and click **Hijacked by a web page** first.
 
 ### Check your setup: `npm run selftest`
 
@@ -148,7 +148,7 @@ src/lib/liveAgent.ts real LLM shopping agent (careful / naive profiles)
 mcp/server.mts      MCP server for Claude Desktop / Cursor / other agents
 scripts/selftest.mts  npm run selftest: key + end-to-end check
 src/lib/orchestrator.ts  verdict → PayPal order / approval / capture
-src/app/            dashboard, phone approval page, API routes
+src/app/            landing page (/), dashboard (/app), login, phone approval page, API routes
 ```
 
 ## Roadmap
