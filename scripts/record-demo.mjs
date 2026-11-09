@@ -7,6 +7,7 @@
 //   OWNER_PASSWORD   dashboard password (required on a deployed site)
 //   HIJACK_TRIES     how many times to run the hijack scenario until the real model falls for it (default 3)
 //   CHROME_PATH      path to a Chrome/Chromium binary (default: your installed Google Chrome)
+//   DEMO_PACE_MS     pause between AI runs, to stay under free Gemini limits (default 15000; 0 with billing on)
 //
 // Output: demo-recordings/<timestamp>/  raw.webm (the video), markers.json (what happened when, for editing),
 // and full-resolution stills of the key moments. PayPal sandbox login is done by you, by hand: the script
@@ -19,6 +20,9 @@ import { join } from "node:path";
 const BASE = (process.env.DEMO_URL || "https://agentleash-9xng.onrender.com").replace(/\/$/, "");
 const PASSWORD = process.env.OWNER_PASSWORD || "";
 const HIJACK_TRIES = Number(process.env.HIJACK_TRIES || 3);
+// Pause between AI runs so the free Gemini tier's per-minute limit isn't hit mid-video (cut in editing).
+const PACE_MS = Number(process.env.DEMO_PACE_MS ?? 15000);
+let aiRuns = 0;
 const W = 1440;
 const H = 900;
 
@@ -105,6 +109,11 @@ async function still(page, name) {
 }
 
 async function runScenario(page, label) {
+  if (aiRuns++ > 0 && PACE_MS > 0) {
+    mark("pace:start");
+    await wait(PACE_MS);
+    mark("pace:end");
+  }
   await smoothScroll(page, 0, 700);
   await click(page, page.getByRole("button", { name: new RegExp(label) }).first());
   mark(`run:${label}`);
@@ -171,8 +180,6 @@ try {
   let fell = false;
   for (let i = 1; i <= HIJACK_TRIES && !fell; i++) {
     if (i > 1) {
-      mark("hijack:retry-wait", { attempt: i });
-      await wait(8000); // stay under the free Gemini per-minute limit
     }
     await runScenario(page, "Hijacked by a web page");
     fell = (await page.getByText("The real model fell for the trap").count()) > 0;
