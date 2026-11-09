@@ -118,6 +118,17 @@ AgentLeash ships an MCP server with two tools, `agentleash_get_rules` and `agent
 }
 ```
 
+## Record the demo video
+
+`npm run record-demo` drives your real browser through the live site (landing scan, honest purchase, the hijack, phone approval, PayPal payment, audit log), with a visible cursor and steady pacing. It reruns the hijack scenario until the live model falls for the trap (up to `HIJACK_TRIES`, default 3) and pauses for you to log in to PayPal sandbox by hand.
+
+```bash
+npx playwright install ffmpeg            # once: the video encoder
+OWNER_PASSWORD=your-password npm run record-demo
+```
+
+On Windows PowerShell: `$env:OWNER_PASSWORD="your-password"; npm run record-demo`. It uses your installed Google Chrome; set `CHROME_PATH` to use another browser and `DEMO_URL` to record a different site. Output goes to `demo-recordings/<time>/`: `raw.webm`, `markers.json` (what happened when) and stills of the key moments.
+
 ## Security
 
 AgentLeash guards money, so it is hardened against being attacked itself:

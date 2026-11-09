@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "selftest": "tsx scripts/selftest.mts",
-    "mcp": "tsx mcp/server.mts"
+    "mcp": "tsx mcp/server.mts",
+    "record-demo": "node scripts/record-demo.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
@@ -29,6 +30,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
+    "playwright": "^1.65.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
