@@ -133,6 +133,12 @@ async function runTicket(page, label) {
   mark(`verdict:${label}`);
 }
 
+// The trace animates in after the verdict, so wait for its closing note before reading it.
+async function fellForTrap(page) {
+  await page.getByText(/fell for the trap|resisted the trap/).first().waitFor({ timeout: 30_000 }).catch(() => {});
+  return (await page.getByText("The real model fell for the trap").count()) > 0;
+}
+
 async function runScenario(page, label) {
   await pace();
   await smoothScroll(page, 0, 700);
@@ -200,10 +206,8 @@ try {
   // 4. Hijacked: retry until the real model falls for the trap (or tries run out)
   let fell = false;
   for (let i = 1; i <= HIJACK_TRIES && !fell; i++) {
-    if (i > 1) {
-    }
     await runScenario(page, "Hijacked by a web page");
-    fell = (await page.getByText("The real model fell for the trap").count()) > 0;
+    fell = await fellForTrap(page);
     mark(fell ? "hijack:FELL" : "hijack:resisted", { attempt: i });
   }
   const hidden = page.getByText("Hidden text found").first();
@@ -263,7 +267,7 @@ try {
   let took = false;
   for (let i = 1; i <= HIJACK_TRIES && !took; i++) {
     await runTicket(page, "Poisoned support ticket");
-    took = (await page.getByText("The real model fell for the trap").count()) > 0;
+    took = await fellForTrap(page);
     mark(took ? "poisoned:FELL" : "poisoned:resisted", { attempt: i });
   }
   const tainted = page.getByText("Hidden text found").first();
