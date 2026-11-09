@@ -14,7 +14,8 @@ const PATTERNS: { re: RegExp; why: string }[] = [
   { re: /(?:budget|spending) (?:rules?|limits?) (?:are|is) (?:outdated|void|lifted|suspended|no longer)/i, why: "claims the budget rules no longer apply" },
   { re: /do not (?:tell|mention|inform|reveal)[^.]{0,30}(?:user|owner|human)/i, why: "asks the agent to hide something from the user" },
   { re: /you must (?:now |instead )?(?:buy|purchase|order|add|pay|send)/i, why: "orders the agent to make a purchase" },
-  { re: /instead (?:buy|purchase|order)/i, why: "redirects the purchase to something else" },
+  { re: /instead (?:buy|purchase|order)|\b(?:buy|purchase|order)\b[^.]{0,80}\binstead\b/i, why: "redirects the purchase to something else" },
+  { re: /recommended way to complete|official (?:gift |fulfil?ment |order )?partner/i, why: "poses as an official store instruction" },
 ];
 
 const HIDDEN = [

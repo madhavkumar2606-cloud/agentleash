@@ -2,10 +2,12 @@
 // Kept on globalThis so it survives Next.js hot reloads. Swap for a database later.
 
 import { SEED_KNOWN_MERCHANTS } from "./catalog";
-import { DEFAULT_RULES, heuristicParsePolicy } from "./firewall/rules";
+import { llmConfig } from "./config";
+import { DEFAULT_RULES, heuristicParsePolicy, parsePolicy } from "./firewall/rules";
 import type { Decision, Mandate } from "./types";
 
 interface State {
+  aiParseStarted?: boolean;
   mandate: Mandate;
   decisions: Decision[];
   knownMerchants: Set<string>;
@@ -29,7 +31,19 @@ const g = globalThis as unknown as { __agentleash?: State };
 
 export function state(): State {
   if (!g.__agentleash) g.__agentleash = freshState();
-  return g.__agentleash;
+  const s = g.__agentleash;
+  // With an AI provider configured, re-parse the default rules with AI once, in the background.
+  if (!s.aiParseStarted && s.mandate.parsedBy === "heuristic" && llmConfig().provider !== "mock") {
+    s.aiParseStarted = true;
+    const { id, rulesText } = s.mandate;
+    parsePolicy(rulesText)
+      .then(({ policy, parsedBy }) => {
+        // Only apply if the owner hasn't saved new rules in the meantime.
+        if (s.mandate.id === id && parsedBy === "llm") s.mandate = { ...s.mandate, policy, parsedBy };
+      })
+      .catch(() => {});
+  }
+  return s;
 }
 
 export function resetState() {

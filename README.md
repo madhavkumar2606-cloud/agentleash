@@ -22,6 +22,7 @@ Every decision is **ALLOW**, **REVIEW** (you approve on your phone, then pay wit
 
 - **Orders v2:** create order → payer approval → capture, wired to the firewall verdict
 - **Owner approval flow:** REVIEW sends you a phone page (QR code on the dashboard). Approve opens PayPal checkout, and the return URL captures the payment.
+- **Verified end to end in sandbox:** firewall verdict → order created → buyer pays at PayPal → capture recorded on the decision.
 - **Order/decision binding:** the PayPal order's `reference_id` and `custom_id` are the firewall decision ID, and capture only runs if the returned token matches the stored order.
 
 ## Run it
@@ -76,7 +77,12 @@ LLM_API_KEY=your-key
 1. Log in at https://developer.paypal.com with any PayPal account.
 2. **Apps & Credentials → Sandbox → Create App** (type: Merchant).
 3. Copy the **Client ID** and **Secret** into `.env.local` as `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET`.
-4. Under **Testing Tools → Sandbox Accounts**, use the auto-created *personal* account to log in at PayPal checkout.
+4. **Use United States sandbox accounts.** Sandbox accounts auto-created for accounts outside the US (e.g. India) fail at checkout with *"This seller doesn't accept payments in your currency."* Fix:
+   - **Testing Tools → Sandbox Accounts → Create account**: one **Business**, one **Personal**, both with country **United States**.
+   - **Create App** again and pick the new US Business account as the app's sandbox account. Use that app's Client ID and Secret.
+   - Log in at PayPal checkout with the US **Personal** account.
+
+> If the developer dashboard shows a blank "unauthorized" page, open it in an incognito window.
 
 ## Use it from any agent
 

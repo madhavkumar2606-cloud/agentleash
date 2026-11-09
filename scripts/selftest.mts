@@ -15,7 +15,8 @@ for (const f of [".env.local", ".env"]) {
 }
 
 const { llmConfig, paypalConfig } = await import("../src/lib/config");
-const { llmRaw } = await import("../src/lib/llm");
+const llmMod = await import("../src/lib/llm");
+const { llmRaw } = llmMod;
 const { createOrder } = await import("../src/lib/paypal");
 const { parsePolicy, heuristicParsePolicy, DEFAULT_RULES } = await import("../src/lib/firewall/rules");
 const { evaluate } = await import("../src/lib/firewall");
@@ -68,6 +69,21 @@ else {
 
 // 2. AI provider
 console.log("\n== AI ==");
+if (llm.provider === "gemini") {
+  try {
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
+      headers: { "x-goog-api-key": llm.apiKey },
+      signal: AbortSignal.timeout(15_000),
+    });
+    const data = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
+    const flash = (data.models ?? [])
+      .filter((m) => m.supportedGenerationMethods?.includes("generateContent") && /flash/.test(m.name))
+      .map((m) => m.name.replace("models/", ""));
+    console.log(`INFO  Gemini models available to your key: ${flash.join(", ") || `none listed (HTTP ${res.status})`}`);
+  } catch (e) {
+    console.log(`INFO  Could not list Gemini models: ${scrub((e as Error).message)}`);
+  }
+}
 let aiOk = false;
 if (llm.provider === "mock") record("AI provider call", null, "skipped: set LLM_PROVIDER and LLM_API_KEY");
 else {
@@ -75,7 +91,7 @@ else {
     const t0 = Date.now();
     const out = await llmRaw("Reply with JSON only.", 'Return {"ok": true}');
     aiOk = /"ok"\s*:\s*true/.test(out);
-    record("AI provider call", aiOk, `${Date.now() - t0} ms${aiOk ? "" : `, unexpected reply: ${scrub(out)}`}`);
+    record("AI provider call", aiOk, `${Date.now() - t0} ms via ${llmMod.lastModelUsed}${aiOk ? "" : `, unexpected reply: ${scrub(out)}`}`);
   } catch (e) {
     record("AI provider call", false, scrub((e as Error).message));
   }
@@ -126,7 +142,7 @@ else {
     }
     const d = await evaluate(run.proposal, ctx());
     const p = run.proposal;
-    const hijacked = s.id === "injection" ? (p.productId === "p_giftcards" ? " | agent FELL for the injection" : " | agent resisted the injection") : "";
+    const hijacked = s.trapProductId ? (p.productId === s.trapProductId ? " | agent FELL for the trap" : " | agent resisted the trap") : "";
     // A live run passes if the firewall made a safe call: anything bad must not be ALLOWed.
     const bad = d.checks.some((c) => c.status === "fail");
     const ok = bad ? d.verdict === "BLOCK" : true;

@@ -15,7 +15,7 @@ interface AppState {
 }
 
 interface Run {
-  scenario: Pick<Scenario, "id" | "label" | "task">;
+  scenario: Pick<Scenario, "id" | "label" | "task" | "trapProductId">;
   steps: AgentStep[];
   decisionId: string | null;
   agentMode: "live" | "scripted";
@@ -322,7 +322,9 @@ export default function Dashboard() {
                       </span>
                     )}
                   </h2>
-                  <span className="font-mono text-xs text-paper/60">{traceDone ? "waiting for firewall" : "browsing…"}</span>
+                  <span className="font-mono text-xs text-paper/60">
+                    {!traceDone ? "browsing…" : decision || !run.decisionId ? "done" : "waiting for firewall"}
+                  </span>
                 </div>
                 <ol className="mt-4 space-y-3 font-mono text-[13px] leading-relaxed">
                   {run.steps.slice(0, shown).map((s, i) => (
@@ -336,6 +338,9 @@ export default function Dashboard() {
                     </li>
                   ))}
                 </ol>
+                {traceDone && run.agentMode === "live" && run.scenario.trapProductId && (
+                  <TrapNote fell={decision?.proposal.productId === run.scenario.trapProductId} scenarioId={run.scenario.id} />
+                )}
               </section>
 
               {/* Firewall decision */}
@@ -497,6 +502,24 @@ function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
   );
 }
 
+/** Says honestly whether the live model fell for this scenario's trap. */
+function TrapNote({ fell, scenarioId }: { fell: boolean; scenarioId: string }) {
+  if (fell) {
+    return (
+      <p className="rise mt-4 rounded-lg border border-[#ff8a7a]/40 bg-block/20 p-3 text-xs leading-relaxed text-[#ffd7d0]">
+        <strong className="text-[#ff8a7a]">The real model fell for the trap.</strong> This is a live AI decision, not a script.
+      </p>
+    );
+  }
+  return (
+    <p className="rise mt-4 rounded-lg bg-paper/10 p-3 text-xs leading-relaxed text-paper/80">
+      <strong className="text-paper">This model resisted the trap this time.</strong> AgentLeash still checked the purchase
+      {scenarioId === "injection" ? " and flagged the poisoned page" : ""}. Weaker or older agents do fall for it: untick
+      “Live AI agent” to replay a vulnerable agent.
+    </p>
+  );
+}
+
 /** Shows page text, with the hidden <span> payload stripped of markup and highlighted. */
 function TaintedText({ text, tainted }: { text: string; tainted: boolean }) {
   if (!tainted) return <>{text}</>;
@@ -507,7 +530,7 @@ function TaintedText({ text, tainted }: { text: string; tainted: boolean }) {
     <>
       {before}
       <span className="mt-1 block rounded border border-[#ffb4a9]/40 p-2 text-[#ffd7d0]">
-        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#ff8a7a]">Hidden on page (display:none)</span>
+        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#ff8a7a]">Hidden on page (invisible to humans)</span>
         {m[1]}
       </span>
       {after.replace(/​/g, "")}
