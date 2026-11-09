@@ -70,6 +70,11 @@ export async function completeCapture(id: string): Promise<Decision> {
   if (d.payment.status === "captured") return d;
   try {
     const cap = await captureOrder(d.payment.orderId);
+    if (cap.status !== "COMPLETED") throw new Error(`PayPal capture status ${cap.status}`);
+    // The money that moved must be exactly what the firewall approved.
+    if (cap.amount !== undefined && (Number(cap.amount) !== d.amount || cap.currency !== d.proposal.currency)) {
+      throw new Error(`Captured ${cap.amount} ${cap.currency}, but ${d.amount.toFixed(2)} ${d.proposal.currency} was approved`);
+    }
     d.payment = { ...d.payment, status: "captured", captureId: cap.captureId };
     state().knownMerchants.add(d.proposal.merchantId);
   } catch (err) {

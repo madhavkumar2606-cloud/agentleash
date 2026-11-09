@@ -11,7 +11,7 @@ interface AppState {
   decisions: Decision[];
   weeklySpent: number;
   scenarios: Scenario[];
-  modes: { paypal: "mock" | "sandbox"; llm: string; model: string };
+  modes: { paypal: "mock" | "sandbox"; llm: string; model: string; auth: "open" | "locked" | "misconfigured" };
 }
 
 interface Run {
@@ -151,6 +151,17 @@ export default function Dashboard() {
           <button onClick={reset} className="rounded-md px-2.5 py-1 font-medium text-muted hover:bg-line/60 hover:text-ink">
             Reset demo
           </button>
+          {data.modes.auth === "locked" && (
+            <button
+              onClick={async () => {
+                await fetch("/api/logout", { method: "POST" });
+                window.location.href = "/login";
+              }}
+              className="rounded-md px-2.5 py-1 font-medium text-muted hover:bg-line/60 hover:text-ink"
+            >
+              Log out
+            </button>
+          )}
         </div>
       </header>
 

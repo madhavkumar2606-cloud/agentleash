@@ -112,11 +112,30 @@ AgentLeash ships an MCP server with two tools, `agentleash_get_rules` and `agent
     "agentleash": {
       "command": "npx",
       "args": ["tsx", "/path/to/agentleash/mcp/server.mts"],
-      "env": { "AGENTLEASH_URL": "http://localhost:3000" }
+      "env": { "AGENTLEASH_URL": "http://localhost:3000", "AGENTLEASH_API_KEY": "same key as the server" }
     }
   }
 }
 ```
+
+## Security
+
+AgentLeash guards money, so it is hardened against being attacked itself:
+
+| Threat | Protection |
+|---|---|
+| Strangers changing rules or approving purchases | Owner password (`OWNER_PASSWORD`) on the dashboard, rules, approvals and agent runs; HMAC-signed httpOnly session cookie. A public deployment **refuses to run** owner pages without a password. |
+| Password guessing | 5 login attempts per minute per IP |
+| Guessing approval links | Decision IDs are random 128-bit UUIDs |
+| Burning your AI quota / spam | Per-IP rate limits on agent runs, rule changes and the firewall API |
+| Rogue agents calling the API | `AGENTLEASH_API_KEY` bearer token, constant-time comparison; required on public deployments |
+| Prompt injection aimed at the firewall's own AI | Rules engine runs alongside the AI on injection *and* intent checks; the stricter result wins. Money rules (limits, blocked items, seller trust, price) are plain code that can't be talked around. |
+| Payment tampering | Capture only when PayPal's returned token matches the stored order; captured amount and currency must equal the approved amount; idempotent PayPal request IDs |
+| Redirect / Host-header tricks | PayPal return URLs come only from `APP_URL`; login redirects only within the app; mock checkout disabled when real PayPal is configured |
+| XSS, clickjacking | React escaping (no raw HTML), `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`, `nosniff` |
+| Leaked secrets | Keys are server-side only and git-ignored; the self-test redacts them |
+
+Known limits (roadmap): seller identity is taken from the agent's request (production would verify the payee with PayPal), and state is in memory on a single instance.
 
 ## Project layout
 

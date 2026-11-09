@@ -8,6 +8,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const d = await ownerApprove(id, originOf(req));
     return NextResponse.json({ decision: d, redirect: d.payment.approveUrl });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 404 });
+    const msg = (err as Error).message;
+    return NextResponse.json({ error: msg }, { status: msg.includes("not found") ? 404 : 500 });
   }
 }

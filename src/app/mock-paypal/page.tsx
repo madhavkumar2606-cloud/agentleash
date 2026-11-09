@@ -2,6 +2,8 @@
 // Clearly labelled as simulated; add PAYPAL_CLIENT_ID/SECRET to use real PayPal sandbox checkout.
 
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { paypalConfig } from "@/lib/config";
 import { PayPalMark } from "@/components/ui";
 
 export default async function MockPayPal({
@@ -9,6 +11,7 @@ export default async function MockPayPal({
 }: {
   searchParams: Promise<{ token?: string; return?: string; amount?: string; item?: string }>;
 }) {
+  if (paypalConfig().mode !== "mock") notFound(); // real PayPal is configured: no fake checkout
   const { token = "", return: ret = "/", amount = "0.00", item = "" } = await searchParams;
   // Only ever return to this app's own PayPal return route (no open redirects).
   let decision = "";

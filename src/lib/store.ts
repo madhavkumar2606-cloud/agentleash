@@ -75,5 +75,5 @@ export function weeklySpent(now = Date.now()): number {
     .reduce((sum, d) => sum + d.amount, 0);
 }
 
-export const newId = (prefix: string) =>
-  `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+/** Random, unguessable IDs (decision IDs appear in approval links). */
+export const newId = (prefix: string) => `${prefix}_${crypto.randomUUID().replace(/-/g, "")}`;

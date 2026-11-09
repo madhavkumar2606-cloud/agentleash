@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { safeEqual } from "@/lib/auth";
 import { firewallApiKey } from "@/lib/config";
+import { rateLimit } from "@/lib/rateLimit";
 import { originOf } from "@/lib/http";
 import { submitProposal } from "@/lib/orchestrator";
 
@@ -22,13 +24,25 @@ const Proposal = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(req, "firewall", 30);
+  if (limited) return limited;
   const key = firewallApiKey();
-  if (key && req.headers.get("authorization") !== `Bearer ${key}`) {
+  if (!key && process.env.APP_URL) {
+    // Deployed publicly without a key would let anyone create orders and spend your AI quota.
+    return NextResponse.json({ error: "Set AGENTLEASH_API_KEY to enable this endpoint on a public deployment." }, { status: 503 });
+  }
+  if (key && !safeEqual(req.headers.get("authorization") ?? "", `Bearer ${key}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const parsed = Proposal.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid proposal", issues: parsed.error.issues }, { status: 400 });
-  const d = await submitProposal(parsed.data, originOf(req));
+  let origin: string;
+  try {
+    origin = originOf(req);
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+  }
+  const d = await submitProposal(parsed.data, origin);
   return NextResponse.json({
     decisionId: d.id,
     verdict: d.verdict,
@@ -36,6 +50,6 @@ export async function POST(req: NextRequest) {
     riskScore: d.riskScore,
     checks: d.checks,
     payment: d.payment,
-    approvalUrl: d.verdict === "REVIEW" ? `${originOf(req)}/approve/${d.id}` : undefined,
+    approvalUrl: d.verdict === "REVIEW" ? `${origin}/approve/${d.id}` : undefined,
   });
 }

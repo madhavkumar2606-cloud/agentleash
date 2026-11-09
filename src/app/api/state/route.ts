@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authMode } from "@/lib/auth";
 import { llmConfig, paypalConfig } from "@/lib/config";
 import { SCENARIOS } from "@/lib/agent";
 import { state, weeklySpent } from "@/lib/store";
@@ -13,6 +14,6 @@ export function GET() {
     decisions: s.decisions.slice(0, 50),
     weeklySpent: weeklySpent(),
     scenarios: SCENARIOS,
-    modes: { paypal: paypalConfig().mode, llm: llm.provider, model: llm.model },
+    modes: { paypal: paypalConfig().mode, llm: llm.provider, model: llm.model, auth: authMode() },
   });
 }

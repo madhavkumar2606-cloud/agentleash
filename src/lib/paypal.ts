@@ -102,7 +102,9 @@ export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder
   return { orderId: data.id, approveUrl: approve.href };
 }
 
-export async function captureOrder(orderId: string): Promise<{ captureId: string; status: string }> {
+export async function captureOrder(
+  orderId: string,
+): Promise<{ captureId: string; status: string; amount?: string; currency?: string }> {
   const cfg = paypalConfig();
   if (cfg.mode === "mock") {
     return { captureId: "MOCKCAP-" + orderId.slice(5), status: "COMPLETED" };
@@ -118,5 +120,5 @@ export async function captureOrder(orderId: string): Promise<{ captureId: string
   if (!res.ok) throw new Error(`PayPal capture failed (${res.status}): ${await res.text()}`);
   const data = await res.json();
   const capture = data?.purchase_units?.[0]?.payments?.captures?.[0];
-  return { captureId: capture?.id ?? "", status: data.status };
+  return { captureId: capture?.id ?? "", status: data.status, amount: capture?.amount?.value, currency: capture?.amount?.currency_code };
 }

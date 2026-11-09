@@ -5,6 +5,7 @@ import { llmConfig } from "@/lib/config";
 import { originOf } from "@/lib/http";
 import { runLiveAgent } from "@/lib/liveAgent";
 import { submitProposal } from "@/lib/orchestrator";
+import { rateLimit } from "@/lib/rateLimit";
 
 const Body = z.object({
   scenario: z.string().optional(),
@@ -18,6 +19,8 @@ const Body = z.object({
  * Without one, or if the AI call fails, scenarios fall back to the scripted agent.
  */
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(req, "agent", 8); // each run makes several AI calls
+  if (limited) return limited;
   const parsed = Body.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Give a scenario or a task (5–500 characters)" }, { status: 400 });
   const { scenario: scenarioId, task, live } = parsed.data;

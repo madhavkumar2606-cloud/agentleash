@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { originOf } from "@/lib/http";
 import { completeCapture } from "@/lib/orchestrator";
 import { getDecision } from "@/lib/store";
 
@@ -9,5 +8,5 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   const d = getDecision(id);
   if (d && d.payment.orderId && d.payment.orderId === token) await completeCapture(id);
-  return NextResponse.redirect(`${originOf(req)}/approve/${encodeURIComponent(id)}`);
+  return NextResponse.redirect(new URL(`/approve/${encodeURIComponent(id)}`, process.env.APP_URL || req.nextUrl.origin));
 }

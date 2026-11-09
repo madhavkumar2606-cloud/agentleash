@@ -22,7 +22,7 @@ const TIMEOUT_MS = 12_000; // per attempt; a model this slow is overloaded, so m
 function fallbackModels(provider: string, primary: string): string[] {
   const extra = (process.env.LLM_FALLBACK_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
   const defaults: Record<string, string[]> = {
-    gemini: ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"],
+    gemini: ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-3.5-flash"],
     anthropic: ["claude-haiku-4-5"],
     openai: ["gpt-4.1-nano"],
   };
@@ -33,6 +33,8 @@ function fallbackModels(provider: string, primary: string): string[] {
 export let lastModelUsed: string | undefined;
 // After a fallback succeeds, try that model first for a while instead of re-hitting an overloaded one.
 let sticky: { model: string; until: number } | undefined;
+// Models that answered 404 ("no longer available") are skipped for the rest of the run.
+const retired = new Set<string>();
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -44,7 +46,7 @@ export async function llmRaw(system: string, user: string): Promise<string> {
   const { provider, apiKey, model } = llmConfig();
   const errors: string[] = [];
   const deadline = Date.now() + 40_000; // total budget so an outage can't hang the app
-  let models = fallbackModels(provider, model);
+  let models = fallbackModels(provider, model).filter((m) => !retired.has(m));
   if (sticky && sticky.until > Date.now() && models.includes(sticky.model)) {
     models = [sticky.model, ...models.filter((m) => m !== sticky!.model)];
   }
@@ -60,6 +62,7 @@ export async function llmRaw(system: string, user: string): Promise<string> {
         const status = err instanceof LlmHttpError ? err.status : 0;
         errors.push(`${m}: ${(err as Error).message.replace(/\s+/g, " ").slice(0, 110)}`);
         if (status === 401 || status === 403) throw err; // bad key: retrying won't help
+        if (status === 404) retired.add(m);
         const timedOut = (err as Error).name === "TimeoutError" || (err as Error).name === "AbortError";
         // Timeout, unknown/unsupported model (400/404), or anything non-retryable: try the next model.
         if (timedOut || !RETRYABLE.has(status)) break;

@@ -29,6 +29,9 @@ const warnings: string[] = [];
 console.warn = (...a: unknown[]) => warnings.push(a.map(String).join(" "));
 
 const results: { name: string; ok: boolean | null; note: string }[] = [];
+// Pause between scenarios when a real AI is used, to stay under free-tier per-minute limits.
+const PACE_MS = Number(process.env.SELFTEST_PACE_MS ?? (process.env.LLM_PROVIDER ? 4000 : 0));
+const pace = () => new Promise((r) => setTimeout(r, PACE_MS));
 const record = (name: string, ok: boolean | null, note: string) => {
   results.push({ name, ok, note });
   console.log(`${ok === null ? "SKIP" : ok ? "PASS" : "FAIL"}  ${name}${note ? `  ${note}` : ""}`);
@@ -120,6 +123,7 @@ const ctx = () => ({
 // 3. Firewall on scripted scenarios (AI checks used if configured)
 console.log("\n== Firewall: scripted agent ==");
 for (const s of SCENARIOS) {
+  if (aiOk) await pace();
   const d = await evaluate(runScenario(s.id).proposal, ctx());
   const ai = d.checks.filter((c) => c.source === "llm").map((c) => c.id);
   record(`${s.id}: expected ${s.expected}`, d.verdict === s.expected, `got ${d.verdict}, risk ${d.riskScore}; AI checks: ${ai.join(", ") || "none"}`);
@@ -131,9 +135,10 @@ console.log("\n== Live AI agent ==");
 if (!aiOk) record("Live agent scenarios", null, "skipped: AI provider not working");
 else {
   for (const s of SCENARIOS) {
+    await pace();
     const run = await runLiveAgent(s.task, s.id);
     if (!run) {
-      record(`live ${s.id}`, false, "agent call failed");
+      record(`live ${s.id}`, false, `agent call failed${warnings.some((w) => w.includes("429")) ? " (Gemini free-tier rate limit: wait a minute and rerun)" : ""}`);
       continue;
     }
     if (!run.proposal) {
