@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Scenario } from "@/lib/agent";
@@ -7,8 +8,10 @@ import type { AgentStep, Decision, Mandate } from "@/lib/types";
 import { FlowBar } from "./FlowBar";
 import { QrCode } from "./QrCode";
 import RedTeam from "./RedTeam";
+
+const AuditGrid = dynamic(() => import("./AuditGrid"), { ssr: false });
 import { PriceLine, RiskDial, ScenarioIcon, SpendRing, Stamp } from "./Receipt";
-import { CheckPill, PaymentChip, PayPalMark, usd, VerdictBadge } from "./ui";
+import { CheckPill, PaymentChip, PayPalMark, usd } from "./ui";
 
 interface AppState {
   mandate: Mandate;
@@ -456,59 +459,7 @@ export default function Dashboard() {
           )}
 
           {/* Audit log */}
-          <section className="rounded-xl border border-line bg-card">
-            <div className="flex items-center justify-between border-b border-line px-5 py-3">
-              <h2 className="text-sm font-semibold">Audit log</h2>
-              <p className="text-xs text-muted">Every purchase any agent attempted</p>
-            </div>
-            {data.decisions.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-muted">No purchases yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-xs text-muted">
-                    <tr>
-                      <th className="px-5 py-2 font-medium">Time</th>
-                      <th className="px-3 py-2 font-medium">Action</th>
-                      <th className="px-3 py-2 text-right font-medium">Amount</th>
-                      <th className="px-3 py-2 font-medium">Verdict</th>
-                      <th className="px-3 py-2 font-medium">Payment</th>
-                      <th className="px-5 py-2 font-medium">Why</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.decisions.map((d) => (
-                      <tr key={d.id} className="border-t border-line align-top">
-                        <td className="whitespace-nowrap px-5 py-3 tabular-nums text-muted">
-                          {new Date(d.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                        </td>
-                        <td className="px-3 py-3">
-                          <p className="font-medium">
-                            {d.toolCall ? d.proposal.title : `${d.proposal.quantity} × ${d.proposal.title}`}
-                          </p>
-                          <p className="text-xs text-muted">{d.proposal.merchantName}</p>
-                        </td>
-                        <td className="px-3 py-3 text-right tabular-nums">{usd(d.amount)}</td>
-                        <td className="px-3 py-3">
-                          <VerdictBadge verdict={d.verdict} />
-                        </td>
-                        <td className="px-3 py-3">
-                          {d.payment.status === "awaiting_owner" ? (
-                            <a href={`/approve/${d.id}`} className="text-xs font-medium text-review underline underline-offset-2">
-                              Review now
-                            </a>
-                          ) : (
-                            <PaymentChip status={d.payment.status} />
-                          )}
-                        </td>
-                        <td className="max-w-sm px-5 py-3 text-xs leading-relaxed text-muted">{d.summary}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+          <AuditGrid decisions={data.decisions} />
         </div>
       </div>
     </main>
