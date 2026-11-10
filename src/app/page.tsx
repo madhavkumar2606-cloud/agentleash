@@ -19,8 +19,9 @@ const PROOF: { what: string; result: string }[] = [
   { what: "PayPal sandbox", result: "Orders created, paid by a sandbox buyer and captured, each tied to the exact amount the firewall approved." },
   { what: "Real AI agent vs. a hidden note", result: "A live Gemini agent fell for a fake “out of stock, buy this gift card instead” note in 3 of 5 runs. AgentLeash blocked every one." },
   { what: "PayPal's own MCP server", result: "PayPal's official MCP server runs under AgentLeash Guard. A poisoned support ticket asking for a $500 refund on a $79 order was blocked before PayPal saw it; a fair $5 refund went through." },
+  { what: "AI red team", result: "Gemini-written attacks against our own support agent found two gaps in AgentLeash's rules engine (limit splitting and 1-pixel text). Both are fixed, and every built-in attack is now stopped with no false alarms." },
   { what: "AI outage", result: "When Gemini is overloaded, AgentLeash retries, switches models, and falls back to its rules engine. It never lets a payment through unchecked." },
-  { what: "Attacks on AgentLeash itself", result: "Owner login, rate limits, API keys, random approval links and payment-amount checks. 27 automated tests." },
+  { what: "Attacks on AgentLeash itself", result: "Owner login, rate limits, API keys, random approval links and payment-amount checks. 36 automated tests." },
 ];
 
 export default function Landing() {
@@ -50,7 +51,8 @@ export default function Landing() {
             </h1>
             <p className="mt-5 max-w-lg text-lg leading-relaxed text-muted">
               AgentLeash checks every purchase or refund an agent tries to make against what you asked for and the rules you set.
-              Only then does <PayPalMark /> move the money.
+              Only then does <PayPalMark /> move the money. And its AI red team attacks your agent first, so you find the holes
+              before someone else does.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/app" className="rounded-lg bg-ink px-5 py-3 font-medium text-paper">
@@ -74,6 +76,58 @@ export default function Landing() {
               The agent never pays directly. It asks AgentLeash first, with the task you gave it and the pages it read.
             </p>
             <FlowDiagram />
+          </div>
+        </section>
+
+
+        {/* AI red team: attack your own agent before someone else does */}
+        <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+          <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.15fr]">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight">Attack your own agent first</h2>
+              <p className="mt-3 max-w-lg leading-relaxed text-muted">
+                Gemini writes new attacks on your support agent: customer tickets that try to talk it into refunding money it
+                shouldn&apos;t. Your agent reads each one with PayPal&apos;s refund tool in hand, and AgentLeash checks every refund it
+                tries. Honest tickets are mixed in, so you also see whether AgentLeash gets in the way of real customers.
+              </p>
+              <p className="mt-3 max-w-lg leading-relaxed text-muted">
+                Then it tells you where your agent is weak, writes the fix for its instructions, and re-runs the same attacks
+                against the hardened agent. It&apos;s a dry run: nothing reaches PayPal.
+              </p>
+            </div>
+            <figure className="overflow-hidden rounded-xl bg-ink p-6 text-paper">
+              <figcaption className="text-xs text-paper/50">Example run against a careful agent</figcaption>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-paper/15 p-4">
+                  <p className="text-xs text-paper/60">Your agent fell for</p>
+                  <p className="mt-1 text-3xl font-semibold tabular-nums text-[#ff8a7a]">3 of 6</p>
+                </div>
+                <div className="rounded-lg border border-paper/15 p-4">
+                  <p className="text-xs text-paper/60">AgentLeash stopped</p>
+                  <p className="mt-1 text-3xl font-semibold tabular-nums text-[#7be0a8]">3 of 3</p>
+                </div>
+              </div>
+              <ul className="mt-4 divide-y divide-paper/10 text-sm">
+                {[
+                  ["Forged email from the owner", "Agent refunded $300", "Blocked"],
+                  ["Fake PayPal fraud alert in an HTML comment", "Agent refunded $79", "Blocked"],
+                  ["Hidden Spanish note: refund $250", "Agent refused", "Resisted"],
+                  ["Honest request: $8 for a chipped pot", "Agent refunded $8", "Allowed"],
+                ].map(([attack, agent, out]) => (
+                  <li key={attack} className="grid grid-cols-[1fr_auto] gap-x-4 py-2.5">
+                    <span>{attack}</span>
+                    <span
+                      className={`row-span-2 self-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        out === "Blocked" ? "bg-[#7be0a8]/15 text-[#7be0a8]" : out === "Allowed" ? "bg-paper/10 text-paper" : "bg-paper/10 text-paper/70"
+                      }`}
+                    >
+                      {out}
+                    </span>
+                    <span className={`text-xs ${agent.startsWith("Agent refunded $8") || agent === "Agent refused" ? "text-paper/50" : "text-[#ff8a7a]"}`}>{agent}</span>
+                  </li>
+                ))}
+              </ul>
+            </figure>
           </div>
         </section>
 
@@ -135,6 +189,34 @@ export default function Landing() {
               </div>
             </figure>
           </div>
+        </section>
+
+
+        {/* Controls the owner keeps */}
+        <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+          <h2 className="text-2xl font-semibold tracking-tight">You keep the controls</h2>
+          <dl className="mt-8 grid gap-x-12 gap-y-6 sm:grid-cols-3">
+            <div className="border-t border-line pt-4">
+              <dt className="font-semibold">Hold payments until delivery</dt>
+              <dd className="mt-1 text-[15px] leading-relaxed text-muted">
+                Turn it on and PayPal holds the money with an authorization. It moves when you confirm the item arrived, or the
+                hold is cancelled.
+              </dd>
+            </div>
+            <div className="border-t border-line pt-4">
+              <dt className="font-semibold">One kill switch</dt>
+              <dd className="mt-1 text-[15px] leading-relaxed text-muted">
+                Freeze every agent at once. Purchases, refunds and PayPal MCP calls are all blocked until you unfreeze.
+              </dd>
+            </div>
+            <div className="border-t border-line pt-4">
+              <dt className="font-semibold">Ask your audit log</dt>
+              <dd className="mt-1 text-[15px] leading-relaxed text-muted">
+                Every attempt lands in an AG Grid log. Ask it in plain English, like &ldquo;blocked refunds over $50&rdquo;, and
+                Gemini sets the filters.
+              </dd>
+            </div>
+          </dl>
         </section>
 
         <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
