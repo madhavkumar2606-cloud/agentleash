@@ -27,5 +27,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app", "/app/:path*", "/approve/:path*", "/api/state", "/api/mandate", "/api/reset", "/api/agent/:path*", "/api/decisions/:path*", "/api/redteam", "/api/redteam/:path*"],
+  matcher: ["/app", "/app/:path*", "/approve/:path*", "/api/state", "/api/mandate", "/api/reset", "/api/agent/:path*", "/api/decisions/:path*", "/api/redteam", "/api/redteam/:path*", "/api/freeze"],
 };

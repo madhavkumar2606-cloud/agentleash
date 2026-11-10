@@ -10,15 +10,27 @@ import { captureOrder, createOrder, refundCapture, registerMockCapture } from ".
 import { getDecision, newId, saveDecision, state, weeklySpent } from "./store";
 import type { Decision, PurchaseProposal, ToolCallProposal } from "./types";
 
+/** Kill switch: while frozen, every agent payment and refund is blocked, whatever the other checks say. */
+function applyFreeze(d: Decision): Decision {
+  const at = state().frozenAt;
+  if (!at) return d;
+  d.verdict = "BLOCK";
+  d.riskScore = Math.max(d.riskScore, 100);
+  d.summary = "Blocked: you froze all agent payments and refunds.";
+  d.checks = [{ id: "freeze", label: "Kill switch", status: "fail", source: "rules", detail: "You froze every agent with the kill switch. Nothing moves until you unfreeze." }, ...d.checks];
+  d.payment = { status: "none" };
+  return d;
+}
+
 export async function submitProposal(p: PurchaseProposal, origin: string): Promise<Decision> {
   const s = state();
-  const decision = await evaluate(p, {
+  const decision = applyFreeze(await evaluate(p, {
     policy: s.mandate.policy,
     weeklySpent: weeklySpent(),
     knownMerchants: s.knownMerchants,
     mandateId: s.mandate.id,
     id: newId("dec"),
-  });
+  }));
   saveDecision(decision);
   if (decision.verdict === "ALLOW") await startPayment(decision, origin, { autoCapture: true });
   return decision;
@@ -88,20 +100,24 @@ const fingerprint = (tool: string, args: Record<string, unknown>) => JSON.string
 export async function submitToolCall(tc: ToolCallProposal, opts: { execute: boolean }): Promise<Decision> {
   const s = state();
   const fp = fingerprint(tc.tool, tc.args);
-  const preApproved = s.decisions.find((d) => d.toolCall && d.payment.status === "approved" && fingerprint(d.toolCall.tool, d.toolCall.args) === fp);
+  const preApproved = s.frozenAt
+    ? undefined
+    : s.decisions.find((d) => d.toolCall && d.payment.status === "approved" && fingerprint(d.toolCall.tool, d.toolCall.args) === fp);
   if (preApproved) {
     preApproved.payment = { status: "none" }; // consumed: the agent may now run it once
     preApproved.verdict = "ALLOW";
     preApproved.summary = "Approved by you. The agent may now run this call once.";
     return saveDecision(preApproved);
   }
-  const d = await evaluateToolCall(tc, {
-    policy: s.mandate.policy,
-    refundedToday: refundedToday(),
-    refundedOnCapture,
-    mandateId: s.mandate.id,
-    id: newId("dec"),
-  });
+  const d = applyFreeze(
+    await evaluateToolCall(tc, {
+      policy: s.mandate.policy,
+      refundedToday: refundedToday(),
+      refundedOnCapture,
+      mandateId: s.mandate.id,
+      id: newId("dec"),
+    }),
+  );
   saveDecision(d);
   if (d.verdict === "ALLOW" && opts.execute && tc.tool === "create_refund") await executeRefund(d);
   return d;

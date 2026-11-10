@@ -14,6 +14,7 @@ export function GET() {
     mandate: s.mandate,
     decisions: s.decisions.slice(0, 50),
     weeklySpent: weeklySpent(),
+    frozenAt: s.frozenAt ?? null,
     scenarios: SCENARIOS,
     supportScenarios: SUPPORT_SCENARIOS.map(({ id, label, blurb, expected }) => ({ id, label, blurb, expected })),
     modes: { paypal: paypalConfig().mode, llm: llm.provider, model: llm.model, auth: authMode() },

@@ -14,6 +14,7 @@ interface AppState {
   mandate: Mandate;
   decisions: Decision[];
   weeklySpent: number;
+  frozenAt: string | null;
   scenarios: Scenario[];
   supportScenarios: { id: string; label: string; blurb: string; expected: string }[];
   modes: { paypal: "mock" | "sandbox"; llm: string; model: string; auth: "open" | "locked" | "misconfigured" };
@@ -120,6 +121,11 @@ export default function Dashboard() {
     }
   }
 
+  async function setFrozen(frozen: boolean) {
+    await fetch("/api/freeze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ frozen }) });
+    await refresh();
+  }
+
   async function reset() {
     await fetch("/api/reset", { method: "POST" });
     rulesTouched.current = false;
@@ -154,6 +160,15 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <ModeBadge label="PayPal" value={data.modes.paypal === "sandbox" ? "Sandbox" : "Mock"} live={data.modes.paypal === "sandbox"} />
           <ModeBadge label="AI checks" value={data.modes.llm === "mock" ? "Heuristic" : data.modes.model} live={data.modes.llm !== "mock"} />
+          {!data.frozenAt && (
+            <button
+              onClick={() => setFrozen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-block/40 px-2.5 py-1 font-semibold text-block hover:bg-block-bg"
+            >
+              <StopIcon />
+              Freeze all agents
+            </button>
+          )}
           <button onClick={reset} className="rounded-md px-2.5 py-1 font-medium text-muted hover:bg-line/60 hover:text-ink">
             Reset demo
           </button>
@@ -170,6 +185,24 @@ export default function Dashboard() {
           )}
         </div>
       </header>
+
+      {data.frozenAt && (
+        <div role="status" className="rise mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-block px-5 py-4 text-paper">
+          <div className="flex items-center gap-3">
+            <StopIcon size={22} />
+            <div>
+              <p className="font-semibold">Every agent is frozen.</p>
+              <p className="text-sm text-paper/80">
+                All payments and refunds are blocked, including calls through PayPal&apos;s MCP tools, until you unfreeze. Since{" "}
+                {new Date(data.frozenAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.
+              </p>
+            </div>
+          </div>
+          <button onClick={() => setFrozen(false)} className="rounded-lg bg-paper px-4 py-2 text-sm font-semibold text-block hover:bg-paper/90">
+            Unfreeze
+          </button>
+        </div>
+      )}
 
       {error && (
         <div role="alert" className="mt-4 rounded-lg bg-block-bg px-4 py-3 text-sm text-block">
@@ -652,6 +685,15 @@ function ModeBadge({ label, value, live }: { label: string; value: string; live:
       <span className="text-muted">{label}:</span>
       <span className="font-medium">{value}</span>
     </span>
+  );
+}
+
+function StopIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M5.2 1.5h5.6l3.7 3.7v5.6l-3.7 3.7H5.2l-3.7-3.7V5.2z" strokeLinejoin="round" />
+      <path d="M5.5 8h5" strokeLinecap="round" />
+    </svg>
   );
 }
 

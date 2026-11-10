@@ -11,6 +11,8 @@ interface State {
   mandate: Mandate;
   decisions: Decision[];
   knownMerchants: Set<string>;
+  /** Kill switch: when set, every agent payment and refund is blocked. */
+  frozenAt?: string;
 }
 
 function freshState(): State {
@@ -73,6 +75,10 @@ export function weeklySpent(now = Date.now()): number {
         Date.parse(d.createdAt) >= weekAgo,
     )
     .reduce((sum, d) => sum + d.amount, 0);
+}
+
+export function setFrozen(on: boolean) {
+  state().frozenAt = on ? new Date().toISOString() : undefined;
 }
 
 /** Random, unguessable IDs (decision IDs appear in approval links). */

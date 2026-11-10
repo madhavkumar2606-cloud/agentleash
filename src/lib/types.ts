@@ -60,7 +60,7 @@ export interface PurchaseProposal {
 export type CheckStatus = "pass" | "warn" | "fail";
 
 export interface CheckResult {
-  id: "policy" | "budget" | "intent" | "injection" | "merchant" | "price" | "paypal" | "refund";
+  id: "policy" | "budget" | "intent" | "injection" | "merchant" | "price" | "paypal" | "refund" | "freeze";
   label: string;
   status: CheckStatus;
   detail: string;
