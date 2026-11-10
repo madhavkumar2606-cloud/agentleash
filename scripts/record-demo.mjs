@@ -207,7 +207,7 @@ try {
   await reset.click();
   await page.waitForTimeout(800);
   mark("dashboard");
-  await moveTo(page, page.locator("#rules"));
+  await moveTo(page, page.locator("#rules-summary"));
   await wait(2500);
 
   // Make sure the live AI agent is on

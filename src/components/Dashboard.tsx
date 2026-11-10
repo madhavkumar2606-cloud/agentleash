@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Scenario } from "@/lib/agent";
 import type { AgentStep, Decision, Mandate } from "@/lib/types";
 import { FlowBar } from "./FlowBar";
+import GuideBar from "./GuideBar";
 import HoldActions from "./HoldActions";
 import { QrCode } from "./QrCode";
 import RedTeam from "./RedTeam";
@@ -54,7 +55,31 @@ export default function Dashboard() {
   const [live, setLive] = useState(true);
   const [customTask, setCustomTask] = useState("");
   const [mode, setMode] = useState<"shop" | "support" | "redteam">("shop");
+  const [editingRules, setEditingRules] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
+  const [redTeamDone, setRedTeamDone] = useState(false);
   const rulesTouched = useRef(false);
+  const outcomeRef = useRef<HTMLDivElement>(null);
+
+  // Remember guide progress and visibility for this viewer (best effort; storage can be unavailable).
+  useEffect(() => {
+    try {
+      setShowGuide(localStorage.getItem("al:guide") !== "hidden");
+      setRedTeamDone(localStorage.getItem("al:redteam") === "done");
+    } catch {}
+  }, []);
+  const hideGuide = (hide: boolean) => {
+    setShowGuide(!hide);
+    try {
+      localStorage.setItem("al:guide", hide ? "hidden" : "shown");
+    } catch {}
+  };
+  const markRedTeamDone = useCallback(() => {
+    setRedTeamDone(true);
+    try {
+      localStorage.setItem("al:redteam", "done");
+    } catch {}
+  }, []);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/state", { cache: "no-store" });
@@ -70,6 +95,13 @@ export default function Dashboard() {
     const t = setInterval(refresh, 2500);
     return () => clearInterval(t);
   }, [refresh]);
+
+  // When a run starts, bring the result area into view so nobody has to hunt for it.
+  useEffect(() => {
+    if (!run || shown !== 1) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    outcomeRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  }, [run, shown]);
 
   // Reveal the agent trace one step at a time, then the firewall decision.
   useEffect(() => {
@@ -154,6 +186,46 @@ export default function Dashboard() {
   const p = data.mandate.policy;
   const blockedCount = data.decisions.filter((d) => d.verdict === "BLOCK").length;
   const savedAmount = data.decisions.filter((d) => d.verdict === "BLOCK").reduce((s, d) => s + d.amount, 0);
+  const ds = data.decisions;
+  const guide = [
+    {
+      title: "Watch an attack get stopped",
+      hint: "A product page hides a note telling the shopping agent to buy a gift card instead.",
+      action: "Run the hijack",
+      done: ds.some((d) => !d.toolCall && d.verdict === "BLOCK" && d.checks.some((c) => c.id === "injection" && c.status !== "pass")),
+      onRun: () => {
+        setMode("shop");
+        runAgent({ scenario: "injection" });
+      },
+    },
+    {
+      title: "Approve a payment from your phone",
+      hint: `A $79 gift is over your $${p.approvalThreshold} limit, so AgentLeash asks you first. Approve it and pay with PayPal.`,
+      action: "Buy the $79 gift",
+      done: ds.some((d) => !d.toolCall && d.verdict === "REVIEW" && ["captured", "authorized"].includes(d.payment.status)),
+      onRun: () => {
+        setMode("shop");
+        runAgent({ scenario: "bigticket" });
+      },
+    },
+    {
+      title: "Protect your shop's refunds",
+      hint: "A customer ticket hides a $500 refund request. The support agent refunds the payment from step 2.",
+      action: "Run the poisoned ticket",
+      done: ds.some((d) => d.toolCall && d.verdict === "BLOCK"),
+      onRun: () => {
+        setMode("support");
+        runAgent({ support: "poisoned" });
+      },
+    },
+    {
+      title: "Attack your own agent",
+      hint: "Gemini writes new attacks on your support agent. See what gets through, and how to fix it.",
+      action: "Open the red team",
+      done: redTeamDone,
+      onRun: () => setMode("redteam"),
+    },
+  ];
 
   return (
     <main className="mx-auto max-w-7xl px-5 pb-20 pt-6 sm:px-8">
@@ -223,39 +295,80 @@ export default function Dashboard() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[340px_1fr]">
         {/* Left: owner's rules + spend */}
-        <aside className="space-y-6">
+        <aside className="order-2 space-y-6 lg:order-1">
           <section className="rounded-xl border border-line bg-card p-5">
-            <h2 className="text-sm font-semibold">Your rules</h2>
-            <p className="mt-1 text-xs text-muted">Plain English. AgentLeash turns them into checks.</p>
-            <label htmlFor="rules" className="sr-only">
-              Spending rules for your AI agents
-            </label>
-            <textarea
-              id="rules"
-              value={rules}
-              onChange={(e) => {
-                rulesTouched.current = true;
-                setRules(e.target.value);
-              }}
-              rows={6}
-              className="mt-3 w-full resize-y rounded-lg border border-line bg-paper p-3 text-sm leading-relaxed outline-none focus:border-ink"
-            />
-            <button
-              onClick={() => saveRules()}
-              disabled={savingRules || rules.trim().length < 5}
-              className="mt-2 w-full rounded-lg bg-ink px-3 py-2 text-sm font-medium text-paper disabled:opacity-50"
-            >
-              {savingRules ? "Saving rules…" : "Save rules"}
-            </button>
-
-            <dl className="mt-4 grid grid-cols-2 gap-2 text-xs">
-              <Rule k="Per purchase" v={`≤ $${p.perTransactionLimit}`} />
-              <Rule k="Per week" v={`≤ $${p.weeklyLimit}`} />
-              <Rule k="Ask me over" v={`$${p.approvalThreshold}`} />
-              <Rule k="Max quantity" v={String(p.maxQuantity)} />
-              <Rule k="New sellers" v={p.reviewNewMerchants ? "Ask me" : "Allowed"} />
-              <Rule k="Parsed by" v={data.mandate.parsedBy === "llm" ? "AI" : "Rules engine"} />
-            </dl>
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-sm font-semibold">Your rules</h2>
+              <span className="text-[11px] text-muted">{data.mandate.parsedBy === "llm" ? "Read by AI" : "Read by the rules engine"}</span>
+            </div>
+            {editingRules ? (
+              <>
+                <p className="mt-1 text-xs text-muted">Write them in plain English. AgentLeash turns them into checks.</p>
+                <label htmlFor="rules" className="sr-only">
+                  Spending rules for your AI agents
+                </label>
+                <textarea
+                  id="rules"
+                  value={rules}
+                  onChange={(e) => {
+                    rulesTouched.current = true;
+                    setRules(e.target.value);
+                  }}
+                  rows={7}
+                  autoFocus
+                  className="mt-3 w-full resize-y rounded-lg border border-line bg-paper p-3 text-sm leading-relaxed outline-none focus:border-ink"
+                />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={async () => {
+                      await saveRules();
+                      setEditingRules(false);
+                    }}
+                    disabled={savingRules || rules.trim().length < 5}
+                    className="flex-1 rounded-lg bg-ink px-3 py-2 text-sm font-medium text-paper disabled:opacity-50"
+                  >
+                    {savingRules ? "Saving rules…" : "Save rules"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      rulesTouched.current = false;
+                      setRules(data.mandate.rulesText);
+                      setEditingRules(false);
+                    }}
+                    className="rounded-lg border border-line px-3 py-2 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-xs text-muted">Every agent payment and refund is checked against these.</p>
+                <ul id="rules-summary" className="mt-3 space-y-1.5 text-sm">
+                  <RuleLine>Up to ${p.perTransactionLimit} per purchase, ${p.weeklyLimit} a week</RuleLine>
+                  <RuleLine>Ask me before anything over ${p.approvalThreshold}</RuleLine>
+                  <RuleLine>No more than {p.maxQuantity} of any item</RuleLine>
+                  {p.reviewNewMerchants && <RuleLine>Ask me before paying a new seller</RuleLine>}
+                  <RuleLine>Refunds over ${p.refundApprovalThreshold} need my approval</RuleLine>
+                  <RuleLine>
+                    Never refund more than ${p.maxRefund} at once, or ${p.dailyRefundLimit} a day
+                  </RuleLine>
+                </ul>
+                {p.blockedCategories.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs text-muted">Never buy</span>
+                    {p.blockedCategories.map((c) => (
+                      <span key={c} className="rounded-md bg-block-bg px-2 py-0.5 text-xs font-medium text-block">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <button onClick={() => setEditingRules(true)} className="mt-3 w-full rounded-lg border border-line px-3 py-2 text-sm font-medium hover:border-ink">
+                  Edit rules
+                </button>
+              </>
+            )}
             <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-paper p-3">
               <input
                 type="checkbox"
@@ -269,15 +382,6 @@ export default function Dashboard() {
                 <span className="text-muted">PayPal holds the money (an authorization). It moves only when you confirm the item arrived.</span>
               </span>
             </label>
-            {p.blockedCategories.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {p.blockedCategories.map((c) => (
-                  <span key={c} className="rounded-md bg-block-bg px-2 py-0.5 text-xs font-medium text-block">
-                    No {c}
-                  </span>
-                ))}
-              </div>
-            )}
           </section>
 
           <section className="rounded-xl border border-line bg-card p-5">
@@ -303,37 +407,52 @@ export default function Dashboard() {
         </aside>
 
         {/* Right: run the agent */}
-        <div className="space-y-6">
+        <div className="order-1 space-y-6 lg:order-2">
+          {showGuide ? (
+            <GuideBar steps={guide} busy={!!busy} onHide={() => hideGuide(true)} />
+          ) : (
+            <button onClick={() => hideGuide(false)} className="text-xs text-muted underline underline-offset-2 hover:text-ink">
+              Show the 4-step guide
+            </button>
+          )}
           <section>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-3">
-                <div role="tablist" aria-label="Which agent" className="inline-flex rounded-lg border border-line bg-card p-0.5 text-sm">
+            <div>
+              <div>
+                <div role="tablist" aria-label="Which agent" className="grid w-full grid-cols-3 gap-2">
                   {(
                     [
-                      ["shop", "Shopping agent"],
-                      ["support", "Support agent · PayPal MCP"],
-                      ["redteam", "AI red team"],
+                      ["shop", "Shopping agent", "Buys things for you", <CartIcon key="i" />],
+                      ["support", "Support agent", "Refunds your customers with PayPal's own tools", <ChatIcon key="i" />],
+                      ["redteam", "AI red team", "Attacks your agent to find its weak spots", <TargetIcon key="i" />],
                     ] as const
-                  ).map(([m, label]) => (
+                  ).map(([m, label, sub, icon]) => (
                     <button
                       key={m}
                       role="tab"
                       aria-selected={mode === m}
                       onClick={() => setMode(m)}
-                      className={`rounded-md px-3 py-1.5 font-medium ${mode === m ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}
+                      className={`flex flex-col items-start gap-1.5 rounded-xl border px-3 py-2.5 text-left transition sm:flex-row sm:gap-3 sm:px-4 sm:py-3 ${
+                        mode === m ? "border-ink bg-ink text-paper" : "border-line bg-card hover:border-ink"
+                      }`}
                     >
-                      {label}
+                      <span className={`mt-0.5 shrink-0 ${mode === m ? "text-paper" : "text-muted"}`}>{icon}</span>
+                      <span>
+                        <span className="block text-sm font-semibold">{label}</span>
+                        <span className={`hidden text-xs leading-snug sm:block ${mode === m ? "text-paper/70" : "text-muted"}`}>{sub}</span>
+                      </span>
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-muted">
-                  {mode === "shop"
-                    ? "An agent shopping for you. Each scenario is a different way it can go wrong."
-                    : mode === "support"
-                      ? "An agent running your shop's PayPal with PayPal's own tools. Customers write the tickets it reads."
-                      : "Gemini attacks your support agent. AgentLeash checks every refund it tries."}
-                </p>
               </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted">
+                {mode === "shop"
+                  ? "Pick a scenario. Each one is a different way a shopping agent can go wrong."
+                  : mode === "support"
+                    ? "Pick a ticket. Customers write the tickets, so any of them can hide instructions for the agent."
+                    : "Launch attacks below. Nothing reaches PayPal: it's a dry run."}
+              </p>
               {mode !== "redteam" && (
               <label className={`inline-flex items-center gap-2 text-xs ${hasLlm ? "" : "opacity-50"}`}>
                 <input
@@ -350,7 +469,7 @@ export default function Dashboard() {
               </label>
               )}
             </div>
-            <div className={`mt-3 grid gap-3 sm:grid-cols-2 ${mode === "shop" ? "xl:grid-cols-5" : "xl:grid-cols-3"} ${mode === "redteam" ? "hidden" : ""}`}>
+            <div className={`mt-3 grid grid-cols-2 gap-3 ${mode === "shop" ? "xl:grid-cols-5" : "xl:grid-cols-3"} ${mode === "redteam" ? "hidden" : ""}`}>
               {(mode === "shop" ? data.scenarios : mode === "support" ? data.supportScenarios : []).map((s) => (
                 <button
                   key={s.id}
@@ -394,7 +513,7 @@ export default function Dashboard() {
             </form>
           </section>
 
-          {mode === "redteam" && <RedTeam hasLlm={hasLlm} />}
+          {mode === "redteam" && <RedTeam hasLlm={hasLlm} onFinished={markRedTeamDone} />}
 
           {!run && mode !== "redteam" && (
             <section className="rounded-xl border border-dashed border-line p-10 text-center">
@@ -416,6 +535,12 @@ export default function Dashboard() {
                 </>
               )}
             </section>
+          )}
+
+          {run && mode !== "redteam" && (
+            <div ref={outcomeRef} className="scroll-mt-4">
+              <Outcome d={traceDone ? decision : undefined} noDecision={traceDone && !run.decisionId} />
+            </div>
           )}
 
           {run && mode !== "redteam" && (
@@ -650,13 +775,103 @@ function TaintedText({ text, tainted }: { text: string; tainted: boolean }) {
   );
 }
 
-function Rule({ k, v }: { k: string; v: string }) {
+function RuleLine({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-md bg-paper px-2.5 py-1.5">
-      <dt className="text-muted">{k}</dt>
-      <dd className="font-semibold tabular-nums">{v}</dd>
+    <li className="flex gap-2 leading-snug">
+      <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-ink/40" aria-hidden />
+      <span>{children}</span>
+    </li>
+  );
+}
+
+/** One plain-English line: what just happened to the money. */
+function Outcome({ d, noDecision }: { d?: Decision; noDecision: boolean }) {
+  let tone: "block" | "review" | "allow" | "pp" | "neutral" = "neutral";
+  let title = "The agent is working…";
+  let detail = "Watch its steps on the left. AgentLeash checks whatever it tries to pay or refund.";
+  if (noDecision) {
+    title = "The agent decided not to pay for anything.";
+    detail = "There was nothing for AgentLeash to check.";
+  } else if (d) {
+    const amount = usd(d.amount);
+    const what = d.toolCall ? (d.toolCall.tool === "create_refund" ? "refund" : "PayPal action") : "payment";
+    const failed = d.checks.filter((c) => c.status === "fail").map((c) => c.label.toLowerCase());
+    const flagged = d.checks.filter((c) => c.status === "warn").map((c) => c.label.toLowerCase());
+    const st = d.payment.status;
+    if (d.verdict === "BLOCK") {
+      tone = "block";
+      title = d.toolCall ? `Stopped. The ${amount} ${what} never ran.` : `Stopped. ${amount} never left your account.`;
+      detail = failed.length ? `Caught by ${listOf(failed)}.` : d.summary;
+    } else if (st === "awaiting_owner") {
+      tone = "review";
+      title = d.toolCall ? `Waiting for you. The agent wants to ${what === "refund" ? `refund ${amount}` : "run a PayPal action"}.` : `Waiting for you. The agent wants to spend ${amount}.`;
+      detail = `${flagged.length ? `Flagged by ${listOf(flagged)}. ` : ""}Scan the code with your phone or open the approval page. Nothing moves until you say yes.`;
+    } else if (st === "rejected") {
+      tone = "neutral";
+      title = "You declined. Nothing moved.";
+      detail = d.summary;
+    } else if (st === "captured") {
+      tone = "allow";
+      title = `Paid. PayPal took ${amount}.`;
+      detail = d.verdict === "REVIEW" ? "You approved it, so it went through." : "It matched your task and every rule.";
+    } else if (st === "refunded") {
+      tone = "allow";
+      title = `Refunded. ${amount} went back to the customer through PayPal.`;
+      detail = "It matched the ticket, the real payment and your refund rules.";
+    } else if (st === "authorized") {
+      tone = "pp";
+      title = `Approved. PayPal is holding ${amount} until you confirm delivery.`;
+      detail = "Release it when the item arrives, or cancel the hold. Nothing is paid until then.";
+    } else if (st === "voided") {
+      title = "Hold cancelled. Nothing was paid.";
+      detail = d.summary;
+    } else if (st === "awaiting_payer") {
+      tone = "allow";
+      title = `Approved. Finish checkout at PayPal to pay ${amount}.`;
+      detail = "It matched your task and every rule.";
+    } else if (st === "approved") {
+      tone = "allow";
+      title = "Approved. The agent may run this PayPal action once.";
+      detail = d.summary;
+    } else if (st === "failed") {
+      tone = "review";
+      title = "PayPal didn't complete it.";
+      detail = d.payment.error ?? d.summary;
+    } else {
+      tone = "allow";
+      title = "Approved.";
+      detail = d.summary;
+    }
+  }
+  const style = {
+    block: "border-block/30 bg-block-bg text-block",
+    review: "border-review/30 bg-review-bg text-review",
+    allow: "border-allow/30 bg-allow-bg text-allow",
+    pp: "border-pp-light/30 bg-[#e6eefb] text-pp",
+    neutral: "border-line bg-card text-ink",
+  }[tone];
+  return (
+    <div role="status" aria-live="polite" className={`flex items-start gap-3 rounded-xl border px-5 py-4 ${style}`}>
+      <OutcomeIcon tone={tone} />
+      <div>
+        <p className="font-semibold">{title}</p>
+        <p className="mt-0.5 text-sm opacity-80">{detail}</p>
+      </div>
     </div>
   );
+}
+
+function listOf(xs: string[]) {
+  return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+}
+
+function OutcomeIcon({ tone }: { tone: string }) {
+  const p = { width: 22, height: 22, viewBox: "0 0 22 22", fill: "none", stroke: "currentColor", strokeWidth: 1.8, "aria-hidden": true } as const;
+  if (tone === "neutral") return <span className="scan-dot mt-2 h-2 w-2 shrink-0 rounded-full bg-ink" aria-hidden />;
+  if (tone === "block") return <svg {...p} className="mt-0.5 shrink-0"><circle cx="11" cy="11" r="8.5" /><path d="M5 17L17 5" strokeLinecap="round" /></svg>;
+  if (tone === "review") return <svg {...p} className="mt-0.5 shrink-0"><circle cx="11" cy="11" r="8.5" /><path d="M11 6.5V11l3 2" strokeLinecap="round" /></svg>;
+  if (tone === "pp") return <svg {...p} className="mt-0.5 shrink-0"><rect x="4" y="9.5" width="14" height="9" rx="2" /><path d="M7.5 9.5V7a3.5 3.5 0 017 0v2.5" /></svg>;
+  return <svg {...p} className="mt-0.5 shrink-0"><circle cx="11" cy="11" r="8.5" /><path d="M7 11.5l2.8 2.8L15.5 8.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
 function ModeBadge({ label, value, live }: { label: string; value: string; live: boolean }) {
@@ -686,6 +901,37 @@ function Logo() {
       <rect x="8.5" y="16" width="16" height="12" rx="3" fill="#f6f4ef" />
       <circle cx="16.5" cy="22" r="1.8" fill="#16150f" />
       <path d="M24.5 22h3.5" stroke="#0070e0" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const iconProps = { width: 18, height: 18, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.6, "aria-hidden": true } as const;
+
+function CartIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M2.5 3.5h2l1.8 9h9l1.7-6.5H5.4" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="7.5" cy="16" r="1.2" />
+      <circle cx="14.5" cy="16" r="1.2" />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M3.5 4.5h13v9h-7l-4 3v-3h-2z" strokeLinejoin="round" />
+      <path d="M7 8.5h6M7 11h4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TargetIcon() {
+  return (
+    <svg {...iconProps}>
+      <circle cx="10" cy="10" r="6.5" />
+      <circle cx="10" cy="10" r="2.5" />
+      <path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" strokeLinecap="round" />
     </svg>
   );
 }

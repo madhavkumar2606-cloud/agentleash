@@ -35,7 +35,7 @@ const OUTCOME: Record<Outcome, { text: string; cls: string }> = {
   error: { text: "AI call failed", cls: "bg-line/70 text-muted" },
 };
 
-export default function RedTeam({ hasLlm }: { hasLlm: boolean }) {
+export default function RedTeam({ hasLlm, onFinished }: { hasLlm: boolean; onFinished?: () => void }) {
   const [target, setTarget] = useState<Target>("careful");
   const [count, setCount] = useState(6);
   const [generate, setGenerate] = useState(true);
@@ -59,8 +59,9 @@ export default function RedTeam({ hasLlm }: { hasLlm: boolean }) {
     if (job?.status === "done") {
       lastJobId.current = job.id;
       if (job.report) lastFix.current = job.report.fix;
+      onFinished?.();
     }
-  }, [job]);
+  }, [job, onFinished]);
 
   async function launch(opts: { target: Target; reuse?: string }) {
     setStarting(true);
