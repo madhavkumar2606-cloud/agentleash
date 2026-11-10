@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { PayPalMark } from "@/components/ui";
+import benchRuns from "../../bench/results.json";
 
 const REPO = "https://github.com/madhavkumar2606-cloud/agentleash";
 
@@ -22,7 +23,18 @@ const PROOF: { what: string; result: string }[] = [
   { what: "PayPal's own MCP server", result: "PayPal's official MCP server runs under Countersign Guard. A poisoned support ticket asking for a $500 refund on a $79 order was blocked before PayPal saw it; a fair $5 refund went through." },
   { what: "AI red team", result: "Gemini-written attacks against our own support agent found two gaps in Countersign's rules engine (limit splitting and 1-pixel text). Both are fixed, and every built-in attack is now stopped with no false alarms." },
   { what: "AI outage", result: "When Gemini is overloaded, Countersign retries, switches models, and falls back to its rules engine. It never lets a payment through unchecked." },
-  { what: "Attacks on Countersign itself", result: "Owner login, rate limits, API keys, random approval links and payment-amount checks. 36 automated tests." },
+  { what: "Attacks on Countersign itself", result: "Owner login, device-signed approvals, rate limits, API keys, a hash-chained log and payment-amount checks. 48 automated tests." },
+];
+
+const bench = benchRuns[0];
+
+const CONTROLS: { name: string; does: string }[] = [
+  { name: "Countersigned approvals", does: "Pin your phone or laptop. Its key never leaves the device, and every approval is signed for that exact payment. A stolen login can't approve anything." },
+  { name: "Hold payments until delivery", does: "PayPal holds the money with an authorization. It moves when you confirm the item arrived. Holds nobody confirms are cancelled after 72 hours." },
+  { name: "One kill switch", does: "Freeze every agent at once. If PayPal reports a buyer dispute on an agent payment, Countersign pulls it for you." },
+  { name: "A log nobody can quietly edit", does: "Every decision, payment, rule change and signature is chained with SHA-256. Your browser re-checks the whole chain in one click." },
+  { name: "PayPal confirms it", does: "Verified PayPal webhooks report what actually happened to each payment, and Countersign flags anything that differs from what it approved." },
+  { name: "Ask your audit log", does: "Ask in plain English, like “blocked refunds over $50”, and Gemini sets the AG Grid filters for you." },
 ];
 
 export default function Landing() {
@@ -193,30 +205,54 @@ export default function Landing() {
         </section>
 
 
+        {/* Countersign Bench: numbers from the live engine */}
+        <section>
+          <div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[1fr_1.2fr]">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight">Countersign Bench</h2>
+              <p className="mt-3 max-w-lg leading-relaxed text-muted">
+                {bench.attacks} attacks and {bench.honest} honest requests, across shopping and customer support, run through the same engine the
+                app uses. Each attack assumes the agent already fell for it, so it measures Countersign, not the model.
+              </p>
+              <p className="mt-3 max-w-lg leading-relaxed text-muted">
+                Open the dashboard and press Run to repeat it on the live server, with the AI off or on. The bench is in the repo:{" "}
+                <code className="rounded bg-line/60 px-1.5 py-0.5 text-sm">npm run bench</code>.
+              </p>
+            </div>
+            <div>
+              <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line">
+                {[
+                  [`${bench.leaked} of ${bench.attacks}`, "attacks got money out"],
+                  [`${bench.falseBlocks} of ${bench.honest}`, "honest requests blocked"],
+                  [`${bench.blocked}`, "attacks blocked outright"],
+                  [`${bench.held}`, "held for you to decide"],
+                ].map(([n, label]) => (
+                  <div key={label} className="bg-card px-5 py-4">
+                    <dt className="sr-only">{label}</dt>
+                    <dd className="text-3xl font-semibold tabular-nums">{n}</dd>
+                    <dd className="text-sm text-muted">{label}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-3 text-sm leading-relaxed text-muted">
+                Rules engine alone, AI switched off. Without Countersign, every attack moves money: $
+                {bench.moneyAtRisk.toLocaleString("en-US")} in total. We tuned the detectors on these cases, so read this as a best case;
+                the red team above writes attacks they have never seen.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Controls the owner keeps */}
         <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
           <h2 className="text-2xl font-semibold tracking-tight">You keep the controls</h2>
-          <dl className="mt-8 grid gap-x-12 gap-y-6 sm:grid-cols-3">
-            <div className="border-t border-line pt-4">
-              <dt className="font-semibold">Hold payments until delivery</dt>
-              <dd className="mt-1 text-[15px] leading-relaxed text-muted">
-                Turn it on and PayPal holds the money with an authorization. It moves when you confirm the item arrived, or the
-                hold is cancelled.
-              </dd>
-            </div>
-            <div className="border-t border-line pt-4">
-              <dt className="font-semibold">One kill switch</dt>
-              <dd className="mt-1 text-[15px] leading-relaxed text-muted">
-                Freeze every agent at once. Purchases, refunds and PayPal MCP calls are all blocked until you unfreeze.
-              </dd>
-            </div>
-            <div className="border-t border-line pt-4">
-              <dt className="font-semibold">Ask your audit log</dt>
-              <dd className="mt-1 text-[15px] leading-relaxed text-muted">
-                Every attempt lands in an AG Grid log. Ask it in plain English, like &ldquo;blocked refunds over $50&rdquo;, and
-                Gemini sets the filters.
-              </dd>
-            </div>
+          <dl className="mt-8 grid gap-x-12 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+            {CONTROLS.map((c) => (
+              <div key={c.name} className="border-t border-line pt-4">
+                <dt className="font-semibold">{c.name}</dt>
+                <dd className="mt-1 text-[15px] leading-relaxed text-muted">{c.does}</dd>
+              </div>
+            ))}
           </dl>
         </section>
 

@@ -8,7 +8,9 @@ It protects both sides of a payment, and lets you attack your own agent before a
 - **Buyer side:** a shopping agent that pays with PayPal (Orders v2, or authorization holds that pay only on delivery).
 - **Merchant side:** a support agent with PayPal's official MCP tools. Countersign Guard is a drop-in replacement for the PayPal MCP server that checks every money-moving tool call first.
 - **AI red team:** Gemini writes new attacks on your support agent (forged owner emails, fake PayPal fraud alerts, hidden HTML, other languages, limit splitting). It scores what your agent fell for and what Countersign stopped, writes the fix for your agent's instructions, and re-runs the attacks against the hardened agent.
-- **Controls you keep:** a kill switch that freezes every agent, and an AG Grid audit log you can question in plain English.
+- **Countersigned approvals:** pin your phone or laptop and every approval is signed by a key that never leaves it, for that exact payment. A stolen login can't approve anything.
+- **Proof, not promises:** a tamper-evident SHA-256 ledger your browser re-checks, verified PayPal webhooks, and **Countersign Bench**, 64 cases you can re-run on the live server.
+- **Controls you keep:** holds that pay only on delivery (and cancel themselves after 72 hours), a kill switch that also trips when PayPal reports a dispute, and an AG Grid audit log you can question in plain English.
 
 Built for the PayPal AI Hackathon 2026 ("Build What's Next with PayPal and AI").
 
@@ -35,6 +37,30 @@ Open the dashboard and pick **AI red team**. Choose the agent under test (carefu
 
 Without an AI key it uses a built-in library of six attacks and a scripted agent. Our own runs found two gaps in Countersign's rules engine (limit-splitting instructions and 1-pixel white text), both now fixed and covered by tests.
 
+## Countersign Bench
+
+44 attacks and 20 honest requests, shopping and support, run through the same engine as the app (`evaluate` / `evaluateToolCall`) as a dry run. Each attack assumes the agent already fell for it, so the bench measures Countersign rather than the model.
+
+```bash
+npm run bench              # rules only, plus rules + AI when LLM_PROVIDER/LLM_API_KEY are set
+npm run bench -- --rules   # rules only
+```
+
+| Mode | Attacks that got money out | Blocked | Held for owner | Honest requests blocked | Extra approvals |
+|---|---|---|---|---|---|
+| Rules only (AI off) | **0 / 44** | 42 | 2 | **0 / 20** | 0 |
+
+The two held cases are a look-alike seller name and an angry customer demanding a full refund: both go to the owner, which is what the rules ask for. Without Countersign all 44 attacks move money ($4,133). Full per-case results: [bench/RESULTS.md](bench/RESULTS.md). On the dashboard (AI red team tab) you can run it live on the server, with the AI off or on, to get the rules + AI numbers for the configured model.
+
+Honesty note: the first run held 9 attacks instead of blocking them and wrongly blocked one honest order. We fixed that bug and taught the detector zero-width/leetspeak disguises, other languages and fake tool output while looking at these cases, so the rules-only score is a best case. The AI red team, which writes attacks the rules have never seen, is the check against overfitting.
+
+## Countersigned approvals, a ledger, and PayPal's word for it
+
+- **Pinned devices.** On the approval page, "Pin this browser" creates a P-256 key with Web Crypto, non-extractable, stored in IndexedDB. Once any device is pinned, approve / decline / release / cancel all need a fresh ECDSA signature over `{decision, action, amount, currency, time}` from a pinned key. Edited, replayed, expired or foreign signatures are refused; pinning a second device needs the owner password.
+- **Tamper-evident ledger.** Every decision, payment change, rule change, kill-switch flip, device pin and countersignature is appended to a SHA-256 hash chain. "Verify chain" in the audit log downloads it and re-hashes every link *in your browser*; "Try tampering" quietly edits a past entry so you can watch the check catch it. `GET /api/ledger/verify` (public, no contents) and the MCP tool `countersign_verify_ledger` return the head hash.
+- **PayPal webhooks.** `POST /api/paypal/webhook` trusts nothing until PayPal's `verify-webhook-signature` API confirms the event for `PAYPAL_WEBHOOK_ID`. Events are matched to their payment, deduplicated and logged; a capture that differs from the approved amount is flagged, and a buyer dispute on an agent payment freezes all agents (`FREEZE_ON_DISPUTE=off` to disable).
+- **Stale holds.** A hold nobody confirms is voided after `HOLD_AUTO_VOID_HOURS` (default 72), so money never sits in limbo.
+
 Every decision is **ALLOW**, **REVIEW** (you approve on your phone, then pay with PayPal) or **BLOCK** (no PayPal order is ever created), with one plain-English reason and a full audit log.
 
 ## How PayPal is used
@@ -45,6 +71,7 @@ Every decision is **ALLOW**, **REVIEW** (you approve on your phone, then pay wit
 - **Payments v2:** refunds are checked against the real capture (`GET /v2/payments/captures/{id}`) and executed with `POST /v2/payments/captures/{id}/refund`, idempotently.
 - **PayPal MCP server (`@paypal/mcp`):** Countersign Guard runs PayPal's official MCP server underneath and gates its 8 money-moving tools (`create_refund`, `pay_order`, `create_order`, `accept_dispute_claim`, `send_invoice`, `cancel_sent_invoice`, `create_subscription`, `cancel_subscription`). The 20 read-only tools pass straight through.
 - **Authorization holds:** with the "hold payments until delivery" rule, orders use `intent: AUTHORIZE`. PayPal holds the money; the owner releases it on delivery (`POST /v2/payments/authorizations/{id}/capture`) or cancels the hold (`/void`). Amounts are verified at both steps.
+- **Webhooks:** verified with `POST /v1/notifications/verify-webhook-signature`; handles `PAYMENT.CAPTURE.COMPLETED/REFUNDED/REVERSED`, `PAYMENT.AUTHORIZATION.VOIDED` and `CUSTOMER.DISPUTE.*`.
 - **Order/decision binding:** the PayPal order's `reference_id` and `custom_id` are the firewall decision ID, and capture only runs if the returned token matches the stored order.
 
 ## Run it
@@ -53,7 +80,8 @@ Every decision is **ALLOW**, **REVIEW** (you approve on your phone, then pay wit
 npm install
 cp .env.example .env.local   # optional: everything works in mock mode without keys
 npm run dev                  # http://localhost:3000
-npm test                     # firewall tests
+npm test                     # 48 tests
+npm run bench                # Countersign Bench
 ```
 
 Open http://localhost:3000 for the landing page, or go straight to the dashboard at **/app** and click **Hijacked by a web page** first.
@@ -126,7 +154,7 @@ Response: `verdict`, `summary`, `riskScore`, per-check results, PayPal payment i
 
 ## Use it from Claude Desktop, Cursor, or any MCP client
 
-Countersign ships an MCP server with two tools, `countersign_get_rules` and `countersign_request_purchase`. Any MCP agent then has to clear purchases with the firewall before paying.
+Countersign ships an MCP server with three tools, `countersign_get_rules`, `countersign_request_purchase` and `countersign_verify_ledger`. Any MCP agent then has to clear purchases with the firewall before paying.
 
 ```json
 {
@@ -190,6 +218,9 @@ Countersign guards money, so it is hardened against being attacked itself:
 
 | Threat | Protection |
 |---|---|
+| A stolen session approving payments | Once a device is pinned, every owner money action needs an ECDSA P-256 signature from it over the exact decision and amount (5-minute window, single use). Pinning another device needs the password. |
+| Someone editing the audit trail | SHA-256 hash-chained ledger, re-verified in the browser |
+| Forged PayPal notifications | Webhooks are verified with PayPal's API against `PAYPAL_WEBHOOK_ID` before anything changes |
 | Strangers changing rules or approving purchases | Owner password (`OWNER_PASSWORD`) on the dashboard, rules, approvals and agent runs; HMAC-signed httpOnly session cookie. A public deployment **refuses to run** owner pages without a password. |
 | Password guessing | 5 login attempts per minute per IP |
 | Guessing approval links | Decision IDs are random 128-bit UUIDs |
@@ -217,6 +248,9 @@ src/lib/guard/      checks for PayPal tool calls (injection, task, verified in P
 src/lib/supportAgent.ts  merchant support agent demo (3 tickets)
 src/lib/redteam.ts  AI red team: Gemini-written attacks, dry-run checks, scorecard, report and fix
 src/lib/auditQuery.ts  "ask your audit log": question → AG Grid filters
+src/lib/ledger.ts   tamper-evident SHA-256 ledger (+ canonical.ts, shared with the browser)
+src/lib/devices.ts  pinned devices and countersignature checks (deviceKey.ts is the browser side)
+src/lib/bench/      Countersign Bench: 64 cases, runner, live jobs (scripts/bench.mts for the CLI)
 src/components/     dashboard, red team, AG Grid audit log, receipts
 scripts/selftest.mts  npm run selftest: key + end-to-end check
 src/lib/orchestrator.ts  verdict → PayPal order / approval / capture
@@ -228,7 +262,8 @@ src/app/            landing page (/), dashboard (/app), login, phone approval pa
 - Vaulted PayPal payment methods so ALLOW verdicts settle with no checkout step (mock mode simulates this today)
 - Red-team any agent over HTTP or MCP, not just the built-in support agent; scheduled red-team runs
 - Seller trust from real PayPal transaction and dispute history
-- Persistent storage (currently in-memory)
+- Persistent storage (currently in-memory: a server restart clears decisions, the ledger and pinned devices)
+- Passkeys (WebAuthn) as an alternative to pinned browser keys
 
 ## License
 
