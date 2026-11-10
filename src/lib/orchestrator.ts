@@ -164,7 +164,7 @@ export async function completeCapture(id: string): Promise<Decision> {
     if (cap.amount !== undefined && (Number(cap.amount) !== d.amount || cap.currency !== d.proposal.currency)) {
       throw new Error(`Captured ${cap.amount} ${cap.currency}, but ${d.amount.toFixed(2)} ${d.proposal.currency} was approved`);
     }
-    d.payment = { ...d.payment, status: "captured", captureId: cap.captureId };
+    d.payment = { ...d.payment, status: "captured", captureId: cap.captureId, error: undefined };
     state().knownMerchants.add(d.proposal.merchantId);
     if (paypalConfig().mode === "mock") {
       registerMockCapture({ id: cap.captureId, status: "COMPLETED", amount: d.amount, currency: d.proposal.currency });
@@ -183,7 +183,7 @@ async function authorizeHold(d: Decision): Promise<Decision> {
     if (auth.amount !== undefined && (Number(auth.amount) !== d.amount || auth.currency !== d.proposal.currency)) {
       throw new Error(`Authorized ${auth.amount} ${auth.currency}, but ${d.amount.toFixed(2)} ${d.proposal.currency} was approved`);
     }
-    d.payment = { ...d.payment, status: "authorized", authorizationId: auth.authorizationId };
+    d.payment = { ...d.payment, status: "authorized", authorizationId: auth.authorizationId, error: undefined };
   } catch (err) {
     d.payment = { ...d.payment, status: "failed", error: (err as Error).message };
   }
@@ -198,7 +198,7 @@ export async function confirmDelivery(id: string): Promise<Decision> {
     const cap = await captureAuthorization(d.payment.authorizationId, `capture-${d.id}`);
     if (cap.status !== "COMPLETED" && cap.status !== "PENDING") throw new Error(`PayPal capture status ${cap.status}`);
     if (cap.amount !== undefined && Number(cap.amount) !== d.amount) throw new Error(`Captured ${cap.amount}, but ${d.amount.toFixed(2)} was approved`);
-    d.payment = { ...d.payment, status: "captured", captureId: cap.captureId };
+    d.payment = { ...d.payment, status: "captured", captureId: cap.captureId, error: undefined };
     state().knownMerchants.add(d.proposal.merchantId);
     if (paypalConfig().mode === "mock") registerMockCapture({ id: cap.captureId, status: "COMPLETED", amount: d.amount, currency: d.proposal.currency });
   } catch (err) {
@@ -213,7 +213,7 @@ export async function releaseHold(id: string): Promise<Decision> {
   if (!d || d.payment.status !== "authorized" || !d.payment.authorizationId) throw new Error("There's no held payment to release for this decision");
   try {
     await voidAuthorization(d.payment.authorizationId);
-    d.payment = { ...d.payment, status: "voided" };
+    d.payment = { ...d.payment, status: "voided", error: undefined };
   } catch (err) {
     d.payment = { ...d.payment, error: (err as Error).message };
   }

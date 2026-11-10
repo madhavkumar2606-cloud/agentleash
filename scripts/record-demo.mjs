@@ -1,7 +1,7 @@
 // Records the AgentLeash demo video by driving a real browser through the live site:
-// landing page, honest purchase, the hijack, phone approval + PayPal payment ($79), then the support agent
-// with PayPal's MCP tools refunding that payment (partial refund, poisoned ticket, full refund held for you),
-// and the audit log.
+// landing page, the hijack, phone approval + PayPal payment ($79), the support agent with PayPal's MCP tools
+// (a fair refund, then a poisoned ticket), the AI red team (attack, scorecard, report, harden and re-run),
+// the kill switch, and asking the AG Grid audit log.
 //
 //   OWNER_PASSWORD=your-password npm run record-demo
 //
@@ -11,6 +11,9 @@
 //   HIJACK_TRIES     how many times to run the hijack scenario until the real model falls for it (default 3)
 //   CHROME_PATH      path to a Chrome/Chromium binary (default: your installed Google Chrome)
 //   DEMO_PACE_MS     pause between AI runs, to stay under free Gemini limits (default 15000; 0 with billing on)
+//   REDTEAM_COUNT    attacks per red-team run: 4, 6 or 8 (default 4)
+//   REDTEAM_HARDEN   0 to skip "harden and re-run" (default: do it)
+//   DEMO_HOLD        1 to turn on "Hold payments until delivery" before the $79 purchase
 //
 // Output: demo-recordings/<timestamp>/  raw.webm (the video), markers.json (what happened when, for editing),
 // and full-resolution stills of the key moments. PayPal sandbox login is done by you, by hand: the script
@@ -25,6 +28,11 @@ const PASSWORD = process.env.OWNER_PASSWORD || "";
 const HIJACK_TRIES = Number(process.env.HIJACK_TRIES || 3);
 // Pause between AI runs so the free Gemini tier's per-minute limit isn't hit mid-video (cut in editing).
 const PACE_MS = Number(process.env.DEMO_PACE_MS ?? 15000);
+// Red team: attacks per run (fewer = faster and gentler on free AI quotas), and whether to harden and re-run.
+const REDTEAM_COUNT = Number(process.env.REDTEAM_COUNT || 4);
+const HARDEN = process.env.REDTEAM_HARDEN !== "0";
+// Turn on "Hold payments until delivery" before the $79 purchase (PayPal authorization, then capture on delivery).
+const HOLD = process.env.DEMO_HOLD === "1";
 let aiRuns = 0;
 const W = 1440;
 const H = 900;
@@ -139,6 +147,15 @@ async function fellForTrap(page) {
   return (await page.getByText("The real model fell for the trap").count()) > 0;
 }
 
+// A red-team run: wait for it to start and finish (the launch button comes back), then show the scorecard.
+async function runRedTeam(page, label) {
+  await page.getByRole("button", { name: /Attacking|writing|Starting|report/ }).first().waitFor({ timeout: 30_000 }).catch(() => {});
+  await page.getByRole("button", { name: /Launch attacks/ }).waitFor({ timeout: 360_000 });
+  mark(`${label}:done`);
+  await smoothScroll(page, 0, 700);
+  await wait(4500);
+}
+
 async function runScenario(page, label) {
   await pace();
   await smoothScroll(page, 0, 700);
@@ -194,16 +211,10 @@ try {
   await wait(2500);
 
   // Make sure the live AI agent is on
-  const live = page.getByRole("checkbox");
+  const live = page.getByRole("checkbox", { name: /Live AI agent/ });
   if ((await live.count()) && !(await live.isChecked()) && (await live.isEnabled())) await click(page, live);
 
-  // 3. Honest purchase
-  await runScenario(page, "Honest purchase");
-  await scrollToEl(page, page.getByText("Purchase check").first());
-  await wait(3500);
-  await still(page, "02-honest-allowed");
-
-  // 4. Hijacked: retry until the real model falls for the trap (or tries run out)
+  // 3. Hijacked: retry until the real model falls for the trap (or tries run out)
   let fell = false;
   for (let i = 1; i <= HIJACK_TRIES && !fell; i++) {
     await runScenario(page, "Hijacked by a web page");
@@ -221,9 +232,17 @@ try {
   await still(page, "04-hijack-verdict");
   mark("hijack:checks");
   await smoothScroll(page, (await page.evaluate(() => window.scrollY)) + 380, 1600);
-  await wait(3500);
+  await wait(3000);
 
-  // 5. Needs approval -> phone page -> PayPal (you log in and pay by hand)
+  // 4. Needs approval -> phone page -> PayPal (you log in and pay by hand)
+  if (HOLD) {
+    await smoothScroll(page, 0, 700);
+    const hold = page.getByText("Hold payments until delivery");
+    await scrollToEl(page, hold, 300);
+    await click(page, hold);
+    await wait(1500);
+    mark("hold:on");
+  }
   await runScenario(page, "Needs your approval");
   await scrollToEl(page, page.getByText("Purchase check").first());
   await wait(3000);
@@ -246,14 +265,21 @@ try {
     mark("paypal:manual-start");
     console.log("\n>>> Log in with your US sandbox BUYER account in the browser window and click Pay. Waiting up to 5 minutes...\n");
   }
+  if (HOLD) {
+    await page.getByText(/PayPal is holding/).first().waitFor({ timeout: 300_000 });
+    mark("paypal:held");
+    await wait(4000);
+    await still(page, "07-held-by-paypal");
+    await click(page, page.getByRole("button", { name: /It arrived/ }));
+  }
   await page.getByText("Paid with PayPal").waitFor({ timeout: 300_000 });
   mark("paypal:paid");
   await wait(3500);
   await still(page, "07-paid");
 
-  // 6. Merchant side: a support agent with PayPal's MCP tools, refunding the $79 payment just made
+  // 5. Merchant side: a support agent with PayPal's MCP tools, refunding the $79 payment just made
   await click(page, page.getByRole("link", { name: "Back to dashboard" }));
-  await page.getByText("Audit log").waitFor();
+  await page.getByRole("tab", { name: /Support agent/ }).waitFor();
   await click(page, page.getByRole("tab", { name: /Support agent/ }));
   mark("support");
   await wait(2500);
@@ -280,35 +306,71 @@ try {
   await wait(4500);
   await still(page, "10-poisoned-blocked");
 
-  // Full refund of what's left: over $50, so it waits for the owner
-  await runTicket(page, "Full refund, never arrived");
-  await scrollToEl(page, page.getByText("Refund check").first());
-  await wait(3000);
-  await still(page, "11-full-refund-held");
-  const reviewRefund = page.getByRole("link", { name: "Review request" });
-  if (await reviewRefund.count()) {
-    await scrollToEl(page, reviewRefund, 300);
-    await click(page, reviewRefund);
-    await page.getByText("Your support agent wants to refund").waitFor();
-    mark("approve-refund-page");
-    await wait(3000);
-    await still(page, "12-approve-refund");
-    await click(page, page.getByRole("button", { name: /Approve/ }));
-    await page.getByText("Refunded through PayPal ✓").waitFor({ timeout: 60_000 });
-    mark("refunded");
-    await wait(3500);
-    await still(page, "13-refunded");
-    await click(page, page.getByRole("link", { name: "Back to dashboard" }));
-  } else {
-    mark("full-refund:not-held", { note: "Under the $50 approval rule, so it refunded straight away" });
+  // 6. AI red team: Gemini attacks the support agent; AgentLeash checks every refund it tries
+  await pace();
+  await smoothScroll(page, 0, 700);
+  await click(page, page.getByRole("tab", { name: "AI red team" }));
+  mark("redteam");
+  await wait(2500);
+  const countSel = page.getByRole("combobox").first();
+  if (await countSel.count()) await countSel.selectOption(String(REDTEAM_COUNT));
+  await click(page, page.getByRole("button", { name: /Launch attacks/ }));
+  mark("redteam:launch");
+  await runRedTeam(page, "redteam");
+  await still(page, "11-redteam-scorecard");
+  // Open the first attack AgentLeash stopped
+  const stopped = page.locator("details summary").filter({ hasText: /Blocked by AgentLeash|Held for your approval/ }).first();
+  if (await stopped.count()) {
+    await click(page, stopped);
+    await wait(1200);
+    await scrollToEl(page, stopped, 120);
+    await wait(5000);
+    await still(page, "12-redteam-attack-detail");
+    mark("redteam:detail");
+  }
+  const report = page.getByText("Where your agent is weak");
+  await scrollToEl(page, report, 160);
+  await wait(5000);
+  await still(page, "13-redteam-report");
+  mark("redteam:report");
+  const harden = page.getByRole("button", { name: /Harden the agent/ });
+  if (HARDEN && (await harden.count())) {
+    await pace();
+    await click(page, harden);
+    mark("redteam:harden");
+    await runRedTeam(page, "hardened");
+    await still(page, "14-redteam-hardened");
   }
 
-  // 7. Audit log: purchases and refunds together
-  await page.getByText("Audit log").waitFor();
-  await scrollToEl(page, page.getByText("Audit log"), 120);
+  // 7. Kill switch: freeze every agent; even a fair refund is blocked
+  await smoothScroll(page, 0, 700);
+  await click(page, page.getByRole("button", { name: "Freeze all agents" }));
+  await page.getByText("Every agent is frozen.").waitFor();
+  mark("freeze");
+  await wait(2500);
+  await click(page, page.getByRole("tab", { name: /Support agent/ }));
+  await runTicket(page, "Fair partial refund");
+  await scrollToEl(page, page.getByText("Refund check").first());
+  await wait(4000);
+  await still(page, "15-frozen-blocked");
+  mark("freeze:blocked");
+  await smoothScroll(page, 0, 700);
+  await click(page, page.getByRole("button", { name: "Unfreeze" }));
+  mark("unfreeze");
+  await wait(1500);
+
+  // 8. Ask the audit log (AG Grid)
+  const audit = page.getByText("Audit log", { exact: true });
+  await scrollToEl(page, audit, 120);
   mark("audit-log");
-  await wait(4500);
-  await still(page, "14-audit-log");
+  await wait(2500);
+  await click(page, page.getByRole("button", { name: "Blocked refunds" }));
+  await wait(3500);
+  await still(page, "16-audit-blocked-refunds");
+  mark("audit:asked");
+  await click(page, page.getByRole("button", { name: "What did hidden instructions try to do?" }));
+  await wait(4000);
+  await still(page, "17-audit-hidden");
   mark("end");
 } catch (err) {
   mark("error", { message: String(err?.message ?? err) });

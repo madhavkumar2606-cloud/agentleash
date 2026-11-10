@@ -18,7 +18,8 @@ export default function HoldActions({ id, amount, onDone, size = "md" }: { id: s
       const res = await fetch(`/api/decisions/${id}/${action}`, { method: "POST" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Something went wrong");
-      if (body.decision?.payment?.error) throw new Error(body.decision.payment.error);
+      // Still held after the call means PayPal refused; the error says why.
+      if (body.decision?.payment?.status === "authorized") throw new Error(body.decision.payment.error ?? "PayPal didn't complete it");
       if (onDone) onDone();
       else window.location.reload();
     } catch (e) {

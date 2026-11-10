@@ -1,7 +1,6 @@
 // Stand-in for PayPal checkout when no sandbox credentials are set.
 // Clearly labelled as simulated; add PAYPAL_CLIENT_ID/SECRET to use real PayPal sandbox checkout.
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { paypalConfig } from "@/lib/config";
 import { PayPalMark } from "@/components/ui";
@@ -37,9 +36,10 @@ export default async function MockPayPal({
         <a href={safePay} className="mt-6 block rounded-full bg-pp-light py-3 text-center font-semibold text-white">
           Pay Now
         </a>
-        <Link href={cancelUrl} className="mt-3 block text-center text-sm text-pp-light">
+        {/* A plain link on purpose: Next's <Link> would prefetch this URL and cancel the order on page load. */}
+        <a href={cancelUrl} className="mt-3 block text-center text-sm text-pp-light">
           Cancel and return
-        </Link>
+        </a>
       </div>
     </main>
   );
