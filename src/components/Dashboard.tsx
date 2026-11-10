@@ -10,6 +10,7 @@ import { FlowBar } from "./FlowBar";
 import GuideBar from "./GuideBar";
 import HoldActions from "./HoldActions";
 import { QrCode } from "./QrCode";
+import BenchPanel from "./BenchPanel";
 import RedTeam from "./RedTeam";
 
 const AuditGrid = dynamic(() => import("./AuditGrid"), { ssr: false });
@@ -514,7 +515,12 @@ export default function Dashboard() {
             </form>
           </section>
 
-          {mode === "redteam" && <RedTeam hasLlm={hasLlm} onFinished={markRedTeamDone} />}
+          {mode === "redteam" && (
+            <>
+              <RedTeam hasLlm={hasLlm} onFinished={markRedTeamDone} />
+              <BenchPanel />
+            </>
+          )}
 
           {!run && mode !== "redteam" && (
             <section className="rounded-xl border border-dashed border-line p-10 text-center">

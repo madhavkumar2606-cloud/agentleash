@@ -36,6 +36,9 @@ export function taskBudget(task: string): number | undefined {
   return undefined;
 }
 
+/** "about $30 each", "$25 per person": the task's budget is per item, not for the whole order. */
+export const budgetIsPerItem = (task: string) => /\$\s?\d+(?:\.\d+)?\s*(?:each|apiece|a piece|per (?:item|person|gift|one|unit))/i.test(task);
+
 function heuristicIntent(p: PurchaseProposal): { score: number; reason: string } {
   const want = new Set(tokens(p.task).flatMap((w) => [w, ...(SYNONYMS[w] ?? [])]));
   const have = new Set([...tokens(p.title), ...tokens(p.category)]);
@@ -74,14 +77,20 @@ export async function checkIntent(p: PurchaseProposal): Promise<CheckResult> {
     score = 0.5;
     reason = `AI says it fits, but the item shares nothing with your task, so you decide. (${llm.reason})`;
   }
+  // And the reverse: the AI alone can't hard-block an item that clearly matches the task's own words.
+  if (llm && llm.score < 0.35 && heur.score >= 0.75) {
+    score = 0.5;
+    reason = `AI doubts it fits, but it matches your task's own words, so you decide. (${llm.reason})`;
+  }
 
-  if (budget !== undefined && amount > budget) {
+  const spend = budgetIsPerItem(p.task) ? p.unitPrice : amount;
+  if (budget !== undefined && spend > budget) {
     return {
       id: "intent",
       label: "Matches your task",
       status: "fail",
       source,
-      detail: `Costs $${amount.toFixed(2)}, but your task said about $${Math.round(budget)}. ${reason}`,
+      detail: `Costs $${spend.toFixed(2)}${spend !== amount ? " each" : ""}, but your task said about $${Math.round(budget)}. ${reason}`,
     };
   }
   const status = score < 0.35 ? "fail" : score < 0.65 ? "warn" : "pass";

@@ -11,7 +11,8 @@
     "selftest": "tsx scripts/selftest.mts",
     "mcp": "tsx mcp/server.mts",
     "record-demo": "node scripts/record-demo.mjs",
-    "paypal-guard": "tsx mcp/paypal-guard.mts"
+    "paypal-guard": "tsx mcp/paypal-guard.mts",
+    "bench": "tsx scripts/bench.mts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

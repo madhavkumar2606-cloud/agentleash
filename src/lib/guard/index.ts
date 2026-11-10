@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 import { decide } from "../firewall";
-import { scanForInjection } from "../firewall/injection";
+import { normalizeForScan, scanForInjection } from "../firewall/injection";
 import { llmJson } from "../llm";
 import { getCapture } from "../paypal";
 import type { CheckResult, Decision, Policy, PurchaseProposal, ToolCallProposal } from "../types";
@@ -77,7 +77,10 @@ async function checkToolInjection(tc: ToolCallProposal, summary: string, amount?
   const hiddenText = [...raw.matchAll(/<!--([\s\S]*?)-->|<(span|div)[^>]*>([\s\S]*?)<\/\2>/g)].map((m) => m[1] ?? m[3]).join(" ");
   const visible = raw.replace(/<!--[\s\S]*?-->|<(span|div)[^>]*(?:display\s*:\s*none|font-size\s*:\s*[01]px|color\s*:\s*#fff)[^>]*>[\s\S]*?<\/\1>/gi, " ");
   const askedVisibly = amount !== undefined && (visible.includes(`$${amount}`) || visible.includes(amount.toFixed(2)));
-  const refundOrdered = tc.tool === "create_refund" && /refund/i.test(hiddenText) && !askedVisibly;
+  // Or the agent-directed text (hidden or not) orders a refund, and the customer never asked for this amount in plain view.
+  const REFUND_WORD = /refund|reembols|rembours|erstatt/i;
+  const refundOrdered =
+    tc.tool === "create_refund" && !askedVisibly && (REFUND_WORD.test(hiddenText) || (found && REFUND_WORD.test(normalizeForScan(raw))));
   let followed = found && (amountInPayload || citesNotice || refundOrdered);
 
   const llm = tc.context

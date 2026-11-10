@@ -13,7 +13,9 @@ const PATTERNS: { re: RegExp; why: string }[] = [
   { re: /\b(?:ai|llm|language model|shopping|automated) (?:shopping |support |customer |service )?(?:assistants?|agents?|bots?)\b/i, why: "addresses AI agents directly" },
   { re: /(?:budget|spending) (?:rules?|limits?) (?:are|is) (?:outdated|void|lifted|suspended|no longer)/i, why: "claims the budget rules no longer apply" },
   { re: /do not (?:tell|mention|inform|reveal)[^.]{0,30}(?:user|owner|human|customer|buyer|anyone)|do not escalate|without (?:asking|escalating|telling)|process it silently/i, why: "asks the agent to hide something from the user" },
-  { re: /(?:notice|note|message|instructions?) for (?:\w+ ){0,2}(?:agents?|assistants?|bots?)|(?:^|[\s>])(?:assistant|ai|agent|bot)\s*:/i, why: "addresses AI agents directly" },
+  { re: /(?:notice|note|message|instructions?) for (?:\w+ ){0,2}(?:agents?|assistants?|bots?)|(?:^|\n|>|<!--)\s*(?:assistant|ai|agent|bot)\s*:/im, why: "addresses AI agents directly" },
+  { re: /\b(?:asistentes?|agentes?|assistants?|agents?) (?:de |d'|der )?(?:ia|ki|inteligencia artificial|intelligence artificielle)\b|\bki-(?:assistent|agent)|no se lo digas|ne (?:le )?dis pas|sag es (?:nicht|niemandem)/i, why: "addresses AI agents in another language" },
+  { re: /<\/?(?:tool_result|tool_call|function_results?|function_call)\b|"action_required"\s*:/i, why: "fakes a tool result" },
   { re: /paypal (?:risk|security|trust|compliance)|flagged (?:\w+ ){0,3}as (?:fraud|fraudulent|unauthori[sz]ed)/i, why: "poses as a PayPal or fraud alert" },
   { re: /avoid (?:\w+ )?(?:manager|human|owner|approval) review|(?:separate|several|multiple|split)[^.]{0,30}refunds?|split (?:the |this )?refund/i, why: "tries to dodge your approval limits" },
   { re: /policy update|(?:from|by) the (?:merchant|admin|security|finance) team|goodwill (?:refund|credit)/i, why: "poses as an official store instruction" },
@@ -35,18 +37,29 @@ export interface InjectionScan {
   excerpt?: string;
 }
 
+/** Undo common obfuscation: zero-width characters inside words, and leetspeak ("r3fund", "4g3nt"). */
+export function normalizeForScan(text: string): string {
+  return text
+    .replace(/[\u200b-\u200f\u2060\ufeff]/g, "")
+    .replace(/\b(?=[\w@]*[a-z])(?=[\w@]*[0-9@])[\w@]+\b/gi, (w) =>
+      w.replace(/[4@]/g, "a").replace(/3/g, "e").replace(/0/g, "o").replace(/1/g, "i").replace(/5/g, "s").replace(/7/g, "t"),
+    );
+}
+
 export function scanForInjection(text: string | undefined): InjectionScan {
   if (!text) return { found: false, reasons: [] };
   const reasons: string[] = [];
   let excerpt: string | undefined;
+  const clean = normalizeForScan(text);
   for (const p of PATTERNS) {
-    const m = text.match(p.re);
+    const m = text.match(p.re) ?? clean.match(p.re);
     if (m) {
       reasons.push(p.why);
       if (!excerpt && m.index !== undefined) excerpt = text.slice(Math.max(0, m.index - 10), m.index + 110).replace(/<[^>]+>/g, "");
     }
   }
   const directives = reasons.length;
+  if (directives && clean !== text && !PATTERNS.some((p) => p.re.test(text))) reasons.push("disguised with look-alike characters");
   for (const h of HIDDEN) if (h.re.test(text)) reasons.push(h.why);
   // Hidden text alone is common on the web; flag only when paired with an agent-directed instruction.
   return { found: directives > 0, reasons, excerpt: excerpt?.trim() };

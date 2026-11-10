@@ -3,6 +3,7 @@
 // failure so callers can fall back to deterministic heuristics (fail-safe).
 
 import type { z } from "zod";
+import { benchScope } from "./benchContext";
 import { llmConfig } from "./config";
 
 class LlmHttpError extends Error {
@@ -161,7 +162,7 @@ export async function llmJson<T>(
   system: string,
   user: string,
 ): Promise<T | null> {
-  if (llmConfig().provider === "mock") return null;
+  if (llmConfig().provider === "mock" || benchScope.getStore()?.noLlm) return null;
   try {
     const text = await llmRaw(system, user);
     const parsed = schema.safeParse(extractJson(text));

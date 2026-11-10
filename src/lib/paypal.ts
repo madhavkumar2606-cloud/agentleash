@@ -1,6 +1,7 @@
 // PayPal Orders v2 client (sandbox), with a mock mode used when no credentials are set.
 // Flow: create order -> payer approves at PayPal -> PayPal redirects to our return URL -> capture.
 
+import { benchScope } from "./benchContext";
 import { paypalConfig } from "./config";
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
@@ -143,6 +144,8 @@ export function registerMockCapture(c: CaptureInfo) {
 
 /** Look up a capture in PayPal. Returns null if PayPal says it doesn't exist. */
 export async function getCapture(captureId: string): Promise<CaptureInfo | null> {
+  const fixture = benchScope.getStore()?.captures;
+  if (fixture) return fixture.get(captureId) ?? null;
   const cfg = paypalConfig();
   if (cfg.mode === "mock") return mockCaptures().get(captureId) ?? null;
   const res = await fetch(`${cfg.baseUrl}/v2/payments/captures/${encodeURIComponent(captureId)}`, {
