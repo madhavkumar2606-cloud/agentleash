@@ -2,6 +2,8 @@
 
 **A firewall between AI agents and your PayPal account.**
 
+**Live demo:** https://countersign-ot5s.onrender.com · **Demo video:** _coming soon_
+
 AI agents can now shop and pay for you, and run your business's PayPal account through PayPal's own MCP server: refunds, invoices, disputes, subscriptions. But an agent can be tricked by a web page or a customer email, wander off-task, or get gouged by a shady seller, and today nothing stands between that mistake and your money. Countersign sits in front of PayPal: every purchase or PayPal action an agent wants to take is checked against **what you actually asked for**, **the rules you wrote in plain English**, and **the real records in PayPal**. Only then does PayPal move money.
 
 It protects both sides of a payment, and lets you attack your own agent before anyone else does:

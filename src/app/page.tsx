@@ -6,7 +6,7 @@ import { Logo } from "@/components/Logo";
 import { PayPalMark } from "@/components/ui";
 import benchRuns from "../../bench/results.json";
 
-const REPO = "https://github.com/madhavkumar2606-cloud/agentleash";
+const REPO = "https://github.com/madhavkumar2606-cloud/countersign";
 
 const CHECKS: { name: string; does: string }[] = [
   { name: "Prompt injection", does: "Scans every page the agent read for hidden instructions aimed at AI, and checks whether the agent obeyed them." },
@@ -306,7 +306,7 @@ export default function Landing() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-sm text-muted sm:px-8">
           <span>Countersign runs on PayPal sandbox. No real money moves.</span>
           <a href={REPO} className="hover:text-ink">
-            github.com/madhavkumar2606-cloud/agentleash
+            github.com/madhavkumar2606-cloud/countersign
           </a>
         </div>
       </footer>

@@ -23,7 +23,7 @@ import { chromium } from "playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const BASE = (process.env.DEMO_URL || "https://agentleash-9xng.onrender.com").replace(/\/$/, "");
+const BASE = (process.env.DEMO_URL || "https://countersign-ot5s.onrender.com").replace(/\/$/, "");
 const PASSWORD = process.env.OWNER_PASSWORD || "";
 const HIJACK_TRIES = Number(process.env.HIJACK_TRIES || 3);
 // Pause between AI runs so the free Gemini tier's per-minute limit isn't hit mid-video (cut in editing).
