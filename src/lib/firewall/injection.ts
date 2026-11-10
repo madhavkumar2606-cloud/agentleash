@@ -12,7 +12,10 @@ const PATTERNS: { re: RegExp; why: string }[] = [
   { re: /(?:system|admin|developer) (?:notice|prompt|message|override|instruction)/i, why: "pretends to be a system message" },
   { re: /\b(?:ai|llm|language model|shopping|automated) (?:shopping |support |customer |service )?(?:assistants?|agents?|bots?)\b/i, why: "addresses AI agents directly" },
   { re: /(?:budget|spending) (?:rules?|limits?) (?:are|is) (?:outdated|void|lifted|suspended|no longer)/i, why: "claims the budget rules no longer apply" },
-  { re: /do not (?:tell|mention|inform|reveal)[^.]{0,30}(?:user|owner|human)|do not escalate|without (?:asking|escalating|telling)/i, why: "asks the agent to hide something from the user" },
+  { re: /do not (?:tell|mention|inform|reveal)[^.]{0,30}(?:user|owner|human|customer|buyer|anyone)|do not escalate|without (?:asking|escalating|telling)|process it silently/i, why: "asks the agent to hide something from the user" },
+  { re: /(?:notice|note|message|instructions?) for (?:\w+ ){0,2}(?:agents?|assistants?|bots?)|(?:^|[\s>])(?:assistant|ai|agent|bot)\s*:/i, why: "addresses AI agents directly" },
+  { re: /paypal (?:risk|security|trust|compliance)|flagged (?:\w+ ){0,3}as (?:fraud|fraudulent|unauthori[sz]ed)/i, why: "poses as a PayPal or fraud alert" },
+  { re: /avoid (?:\w+ )?(?:manager|human|owner|approval) review|(?:separate|several|multiple|split)[^.]{0,30}refunds?|split (?:the |this )?refund/i, why: "tries to dodge your approval limits" },
   { re: /policy update|(?:from|by) the (?:merchant|admin|security|finance) team|goodwill (?:refund|credit)/i, why: "poses as an official store instruction" },
   { re: /you must (?:now |instead )?(?:buy|purchase|order|add|pay|send)/i, why: "orders the agent to make a purchase" },
   { re: /instead (?:buy|purchase|order)|\b(?:buy|purchase|order)\b[^.]{0,80}\binstead\b/i, why: "redirects the purchase to something else" },
@@ -20,7 +23,7 @@ const PATTERNS: { re: RegExp; why: string }[] = [
 ];
 
 const HIDDEN = [
-  { re: /display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0/i, why: "text hidden from humans with CSS" },
+  { re: /display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*[01](?:px)?\b|opacity\s*:\s*0|color\s*:\s*(?:#fff\b|#ffffff|white)/i, why: "text hidden from humans with CSS" },
   { re: /[​-‏⁠﻿]/, why: "invisible zero-width characters" },
   { re: /<!--[\s\S]*?-->/, why: "instructions inside HTML comments" },
 ];

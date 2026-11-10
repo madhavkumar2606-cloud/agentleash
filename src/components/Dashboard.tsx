@@ -6,6 +6,7 @@ import type { Scenario } from "@/lib/agent";
 import type { AgentStep, Decision, Mandate } from "@/lib/types";
 import { FlowBar } from "./FlowBar";
 import { QrCode } from "./QrCode";
+import RedTeam from "./RedTeam";
 import { PriceLine, RiskDial, ScenarioIcon, SpendRing, Stamp } from "./Receipt";
 import { CheckPill, PaymentChip, PayPalMark, usd, VerdictBadge } from "./ui";
 
@@ -47,7 +48,7 @@ export default function Dashboard() {
   const [origin, setOrigin] = useState("");
   const [live, setLive] = useState(true);
   const [customTask, setCustomTask] = useState("");
-  const [mode, setMode] = useState<"shop" | "support">("shop");
+  const [mode, setMode] = useState<"shop" | "support" | "redteam">("shop");
   const rulesTouched = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -254,6 +255,7 @@ export default function Dashboard() {
                     [
                       ["shop", "Shopping agent"],
                       ["support", "Support agent · PayPal MCP"],
+                      ["redteam", "AI red team"],
                     ] as const
                   ).map(([m, label]) => (
                     <button
@@ -270,9 +272,12 @@ export default function Dashboard() {
                 <p className="text-xs text-muted">
                   {mode === "shop"
                     ? "An agent shopping for you. Each scenario is a different way it can go wrong."
-                    : "An agent running your shop's PayPal with PayPal's own tools. Customers write the tickets it reads."}
+                    : mode === "support"
+                      ? "An agent running your shop's PayPal with PayPal's own tools. Customers write the tickets it reads."
+                      : "Gemini attacks your support agent. AgentLeash checks every refund it tries."}
                 </p>
               </div>
+              {mode !== "redteam" && (
               <label className={`inline-flex items-center gap-2 text-xs ${hasLlm ? "" : "opacity-50"}`}>
                 <input
                   type="checkbox"
@@ -286,9 +291,10 @@ export default function Dashboard() {
                   <span className="text-muted">{hasLlm ? "(a real model decides)" : "(add an AI key to enable)"}</span>
                 </span>
               </label>
+              )}
             </div>
-            <div className={`mt-3 grid gap-3 sm:grid-cols-2 ${mode === "shop" ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>
-              {(mode === "shop" ? data.scenarios : data.supportScenarios).map((s) => (
+            <div className={`mt-3 grid gap-3 sm:grid-cols-2 ${mode === "shop" ? "xl:grid-cols-5" : "xl:grid-cols-3"} ${mode === "redteam" ? "hidden" : ""}`}>
+              {(mode === "shop" ? data.scenarios : mode === "support" ? data.supportScenarios : []).map((s) => (
                 <button
                   key={s.id}
                   onClick={() => runAgent(mode === "shop" ? { scenario: s.id } : { support: s.id })}
@@ -331,7 +337,9 @@ export default function Dashboard() {
             </form>
           </section>
 
-          {!run && (
+          {mode === "redteam" && <RedTeam hasLlm={hasLlm} />}
+
+          {!run && mode !== "redteam" && (
             <section className="rounded-xl border border-dashed border-line p-10 text-center">
               {mode === "shop" ? (
                 <>
@@ -353,7 +361,7 @@ export default function Dashboard() {
             </section>
           )}
 
-          {run && (
+          {run && mode !== "redteam" && (
             <div className="grid gap-6 xl:grid-cols-2">
               {/* Agent trace */}
               <section className="rounded-xl border border-line bg-ink p-5 text-paper">
