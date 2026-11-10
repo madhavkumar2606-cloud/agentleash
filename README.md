@@ -76,6 +76,24 @@ Every decision is **ALLOW**, **REVIEW** (you approve on your phone, then pay wit
 - **Webhooks:** verified with `POST /v1/notifications/verify-webhook-signature`; handles `PAYMENT.CAPTURE.COMPLETED/REFUNDED/REVERSED`, `PAYMENT.AUTHORIZATION.VOIDED` and `CUSTOMER.DISPUTE.*`.
 - **Order/decision binding:** the PayPal order's `reference_id` and `custom_id` are the firewall decision ID, and capture only runs if the returned token matches the stored order.
 
+## How AI is used
+
+Google **Gemini** (`gemini-flash-lite-latest` by default, with fallback models) does six jobs. Every AI check runs alongside a deterministic rules engine and the stricter result wins, so Countersign still works if the AI is down.
+
+- **Rules:** turns the owner's plain-English rules into limits, blocked categories, quantity caps and refund limits.
+- **Prompt injection review:** reads the pages and tickets the agent saw, and judges whether hidden instructions steered it.
+- **Task match:** checks that a purchase or refund serves what the owner or customer actually asked for.
+- **Live agents:** the shopping agent and the support agent in the demo are real Gemini agents, so they really can be tricked.
+- **AI red team:** writes new attack tickets, scores the results, explains where the agent is weak and writes a fix.
+- **Audit log questions:** turns a plain-English question into AG Grid filters and sort order.
+
+The AI layer is swappable: set `LLM_PROVIDER` to `gemini`, `anthropic` or `openai`.
+
+## Sponsor tools
+
+- **Render:** the live demo runs on a Render web service, deployed from this repo on every push. Build command `npm install && npm run build`, start command `npm start`, with the environment variables listed in `.env.example`.
+- **AG Grid** (Community, `ag-grid-react`): the audit log on the dashboard. It shows every purchase and refund with its verdict and reason, and Gemini drives its filters from plain-English questions.
+
 ## Run it
 
 ```bash
