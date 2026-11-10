@@ -52,15 +52,17 @@ export const PAYMENT_TEXT: Record<PaymentStatus, string> = {
   captured: "Paid via PayPal",
   refunded: "Refunded via PayPal",
   approved: "Approved: agent may proceed",
+  authorized: "Held by PayPal until delivery",
+  voided: "Hold cancelled, nothing paid",
   rejected: "Declined",
   failed: "Payment failed",
 };
 
 export function PaymentChip({ status }: { status: PaymentStatus }) {
   const cls =
-    status === "captured" || status === "refunded"
+    status === "captured" || status === "refunded" || status === "authorized"
       ? "text-pp bg-[#e6eefb]"
-      : status === "failed" || status === "rejected"
+      : status === "failed" || status === "rejected" || status === "voided"
         ? "text-muted bg-line/60"
         : status === "none"
           ? "text-muted"

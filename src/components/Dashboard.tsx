@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Scenario } from "@/lib/agent";
 import type { AgentStep, Decision, Mandate } from "@/lib/types";
 import { FlowBar } from "./FlowBar";
+import HoldActions from "./HoldActions";
 import { QrCode } from "./QrCode";
 import RedTeam from "./RedTeam";
 
@@ -105,14 +106,21 @@ export default function Dashboard() {
     }
   }
 
-  async function saveRules() {
+  async function toggleHold(on: boolean) {
+    const base = rules.replace(/\s*Hold agent payments until I confirm delivery\.?/gi, "").trim();
+    const next = on ? `${base} Hold agent payments until I confirm delivery.` : base;
+    setRules(next);
+    await saveRules(next);
+  }
+
+  async function saveRules(text = rules) {
     setSavingRules(true);
     setError(undefined);
     try {
       const res = await fetch("/api/mandate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rulesText: rules }),
+        body: JSON.stringify({ rulesText: text }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Could not save rules");
       rulesTouched.current = false;
@@ -233,7 +241,7 @@ export default function Dashboard() {
               className="mt-3 w-full resize-y rounded-lg border border-line bg-paper p-3 text-sm leading-relaxed outline-none focus:border-ink"
             />
             <button
-              onClick={saveRules}
+              onClick={() => saveRules()}
               disabled={savingRules || rules.trim().length < 5}
               className="mt-2 w-full rounded-lg bg-ink px-3 py-2 text-sm font-medium text-paper disabled:opacity-50"
             >
@@ -248,6 +256,19 @@ export default function Dashboard() {
               <Rule k="New sellers" v={p.reviewNewMerchants ? "Ask me" : "Allowed"} />
               <Rule k="Parsed by" v={data.mandate.parsedBy === "llm" ? "AI" : "Rules engine"} />
             </dl>
+            <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-paper p-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-[#0070e0]"
+                checked={p.holdUntilDelivered}
+                disabled={savingRules}
+                onChange={(e) => toggleHold(e.target.checked)}
+              />
+              <span className="text-xs leading-relaxed">
+                <span className="block text-sm font-medium">Hold payments until delivery</span>
+                <span className="text-muted">PayPal holds the money (an authorization). It moves only when you confirm the item arrived.</span>
+              </span>
+            </label>
             {p.blockedCategories.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {p.blockedCategories.map((c) => (
@@ -452,7 +473,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                 ) : (
-                  <DecisionCard d={decision} origin={origin} />
+                  <DecisionCard d={decision} origin={origin} onChange={refresh} />
                 )}
               </section>
             </div>
@@ -466,7 +487,7 @@ export default function Dashboard() {
   );
 }
 
-function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
+function DecisionCard({ d, origin, onChange }: { d: Decision; origin: string; onChange?: () => void }) {
   const approveUrl = `${origin}/approve/${d.id}`;
   const time = new Date(d.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return (
@@ -538,7 +559,16 @@ function DecisionCard({ d, origin }: { d: Decision; origin: string }) {
             <span className="font-mono text-xs text-muted">Refund {d.payment.refundId}</span>
           </div>
         )}
-        {d.verdict === "ALLOW" && !d.toolCall && (
+        {d.payment.status === "authorized" && (
+          <div className="space-y-2 rounded-lg bg-[#e6eefb]/70 p-3">
+            <p className="text-sm text-pp">
+              <span className="font-semibold">PayPal is holding the money.</span> Authorization{" "}
+              <span className="font-mono text-xs">{d.payment.authorizationId}</span>
+            </p>
+            <HoldActions id={d.id} amount={d.amount} size="sm" onDone={onChange} />
+          </div>
+        )}
+        {d.verdict === "ALLOW" && !d.toolCall && d.payment.status !== "authorized" && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <PaymentChip status={d.payment.status} />
             {d.payment.orderId && <span className="font-mono text-xs text-muted">Order {d.payment.orderId}</span>}

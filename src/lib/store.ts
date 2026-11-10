@@ -71,7 +71,7 @@ export function weeklySpent(now = Date.now()): number {
   return state()
     .decisions.filter(
       (d) =>
-        (d.payment.status === "captured" || d.payment.status === "awaiting_payer") &&
+        (d.payment.status === "captured" || d.payment.status === "awaiting_payer" || d.payment.status === "authorized") &&
         Date.parse(d.createdAt) >= weekAgo,
     )
     .reduce((sum, d) => sum + d.amount, 0);

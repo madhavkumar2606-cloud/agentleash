@@ -22,7 +22,11 @@ export const DEFAULT_POLICY: Policy = {
   refundApprovalThreshold: 50,
   maxRefund: 200,
   dailyRefundLimit: 300,
+  holdUntilDelivered: false,
 };
+
+/** "Hold agent payments until I confirm delivery", "only pay once it arrives", … */
+export const HOLD_RULE = /\bhold\b[^.]*\buntil\b[^.]*(?:deliver|arriv|confirm|ship)|(?:only )?pay (?:only )?(?:after|once|when)[^.]*(?:deliver|arriv)/i;
 
 const num = (s: string | undefined) => (s ? Number(s.replace(/,/g, "")) : undefined);
 const AMT = String.raw`\$?\s?(\d[\d,]*(?:\.\d+)?)`;
@@ -68,6 +72,7 @@ export function heuristicParsePolicy(text: string): Policy {
     t.match(new RegExp(String.raw`refund[^.]*?${AMT}\s*(?:a|per|each)\s*day`)) ??
     t.match(new RegExp(String.raw`(?:or|and)\s*${AMT}\s*(?:a|per)\s*day`));
   if (refundDay) policy.dailyRefundLimit = num(refundDay[1])!;
+  policy.holdUntilDelivered = HOLD_RULE.test(t);
   return policy;
 }
 
@@ -81,6 +86,7 @@ const PolicySchema = z.object({
   refundApprovalThreshold: z.number().nonnegative().default(DEFAULT_POLICY.refundApprovalThreshold),
   maxRefund: z.number().positive().default(DEFAULT_POLICY.maxRefund),
   dailyRefundLimit: z.number().positive().default(DEFAULT_POLICY.dailyRefundLimit),
+  holdUntilDelivered: z.boolean().default(false),
 });
 
 export async function parsePolicy(text: string): Promise<{ policy: Policy; parsedBy: "llm" | "heuristic" }> {
@@ -91,7 +97,7 @@ export async function parsePolicy(text: string): Promise<{ policy: Policy; parse
       "Amounts are USD numbers. If a rule is not stated, use these defaults: " +
       JSON.stringify(DEFAULT_POLICY) +
       ". blockedCategories are short lowercase category names (e.g. \"alcohol\", \"gift cards\").",
-    `Rules:\n"""${text}"""\nReturn JSON with keys perTransactionLimit, weeklyLimit, approvalThreshold, blockedCategories, maxQuantity, reviewNewMerchants, refundApprovalThreshold, maxRefund, dailyRefundLimit.`,
+    `Rules:\n"""${text}"""\nReturn JSON with keys perTransactionLimit, weeklyLimit, approvalThreshold, blockedCategories, maxQuantity, reviewNewMerchants, refundApprovalThreshold, maxRefund, dailyRefundLimit, holdUntilDelivered (true if payments should be held until the owner confirms delivery).`,
   );
   if (!llm) return { policy: heuristic, parsedBy: "heuristic" };
   // Safety floor: blocked categories found by either parser are kept.
@@ -100,6 +106,7 @@ export async function parsePolicy(text: string): Promise<{ policy: Policy; parse
       currency: "USD",
       ...llm,
       blockedCategories: [...new Set([...llm.blockedCategories.map((c) => c.toLowerCase()), ...heuristic.blockedCategories])],
+      holdUntilDelivered: llm.holdUntilDelivered || heuristic.holdUntilDelivered,
     },
     parsedBy: "llm",
   };

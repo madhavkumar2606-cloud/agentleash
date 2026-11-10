@@ -116,9 +116,9 @@ export default function AuditGrid({ decisions }: { decisions: Decision[] }) {
         filter: "agTextColumnFilter",
         cellRenderer: (p: CustomCellRendererProps<Row>) =>
           p.data &&
-          (p.data.d.payment.status === "awaiting_owner" ? (
-            <a href={`/approve/${p.data.id}`} className="text-xs font-medium text-review underline underline-offset-2">
-              Review now
+          (p.data.d.payment.status === "awaiting_owner" || p.data.d.payment.status === "authorized" ? (
+            <a href={`/approve/${p.data.id}`} className={`text-xs font-medium underline underline-offset-2 ${p.data.d.payment.status === "authorized" ? "text-pp-light" : "text-review"}`}>
+              {p.data.d.payment.status === "authorized" ? "Held · confirm delivery" : "Review now"}
             </a>
           ) : (
             <PaymentChip status={p.data.d.payment.status} />

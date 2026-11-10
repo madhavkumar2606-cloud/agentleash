@@ -10,10 +10,13 @@ export function FlowBar({ verdict, payment, amount }: { verdict: Verdict; paymen
   const ok = payment === "approved";
   const blocked = verdict === "BLOCK";
   const paid = payment === "captured" || payment === "refunded";
+  const onHold = payment === "authorized";
 
   const link = blocked
     ? "bg-block"
-    : paid || ok || payment === "awaiting_payer"
+    : onHold
+      ? "bg-[repeating-linear-gradient(90deg,var(--color-pp-light)_0_6px,transparent_6px_11px)]"
+      : paid || ok || payment === "awaiting_payer"
       ? "bg-allow"
       : held
         ? "bg-[repeating-linear-gradient(90deg,var(--color-review)_0_6px,transparent_6px_11px)]"
@@ -23,6 +26,10 @@ export function FlowBar({ verdict, payment, amount }: { verdict: Verdict; paymen
     ? `${usd(amount)} never reached PayPal.`
     : payment === "rejected"
       ? `You declined. ${usd(amount)} stayed with you.`
+      : onHold
+        ? `PayPal is holding ${usd(amount)}. It moves only when you confirm delivery.`
+        : payment === "voided"
+          ? `Hold cancelled. ${usd(amount)} never left your account.`
       : held
         ? `Held at AgentLeash until you approve.`
         : payment === "refunded"
@@ -50,10 +57,10 @@ export function FlowBar({ verdict, payment, amount }: { verdict: Verdict; paymen
             </span>
           )}
         </span>
-        <Node label="PayPal" tone={paid ? "pp" : undefined} dim={blocked} />
+        <Node label="PayPal" tone={paid || onHold ? "pp" : undefined} dim={blocked} />
       </div>
       {caption && (
-        <figcaption className={`mt-2 text-sm font-medium ${blocked ? "text-block" : held ? "text-review" : "text-allow"}`}>
+        <figcaption className={`mt-2 text-sm font-medium ${blocked ? "text-block" : held ? "text-review" : onHold ? "text-pp-light" : payment === "voided" ? "text-muted" : "text-allow"}`}>
           {caption}
         </figcaption>
       )}

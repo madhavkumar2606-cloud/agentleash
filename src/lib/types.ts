@@ -23,6 +23,8 @@ export interface Policy {
   maxRefund: number;
   /** Cap on all agent-issued refunds in one day. */
   dailyRefundLimit: number;
+  /** Pay with a PayPal authorization hold; money moves only when the owner confirms delivery. */
+  holdUntilDelivered: boolean;
 }
 
 /** The owner's standing rules for every agent purchase. */
@@ -77,6 +79,8 @@ export type PaymentStatus =
   | "captured"
   | "refunded"
   | "approved"
+  | "authorized"
+  | "voided"
   | "rejected"
   | "failed";
 
@@ -86,6 +90,9 @@ export interface PaymentInfo {
   approveUrl?: string;
   captureId?: string;
   refundId?: string;
+  /** "AUTHORIZE" when the payment is held by PayPal until delivery. */
+  intent?: "CAPTURE" | "AUTHORIZE";
+  authorizationId?: string;
   error?: string;
 }
 

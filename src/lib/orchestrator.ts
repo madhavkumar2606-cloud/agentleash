@@ -6,7 +6,7 @@
 import { paypalConfig } from "./config";
 import { evaluate } from "./firewall";
 import { evaluateToolCall } from "./guard";
-import { captureOrder, createOrder, refundCapture, registerMockCapture } from "./paypal";
+import { authorizeOrder, captureAuthorization, captureOrder, createOrder, refundCapture, registerMockCapture, voidAuthorization } from "./paypal";
 import { getDecision, newId, saveDecision, state, weeklySpent } from "./store";
 import type { Decision, PurchaseProposal, ToolCallProposal } from "./types";
 
@@ -38,8 +38,10 @@ export async function submitProposal(p: PurchaseProposal, origin: string): Promi
 
 async function startPayment(d: Decision, origin: string, opts: { autoCapture: boolean }) {
   const p = d.proposal;
+  const intent = state().mandate.policy.holdUntilDelivered ? "AUTHORIZE" : "CAPTURE";
   try {
     const order = await createOrder({
+      intent,
       referenceId: d.id,
       description: `AgentLeash: ${p.title} from ${p.merchantName}`,
       itemName: p.title,
@@ -49,7 +51,7 @@ async function startPayment(d: Decision, origin: string, opts: { autoCapture: bo
       returnUrl: `${origin}/api/paypal/return?decision=${d.id}`,
       cancelUrl: `${origin}/api/paypal/cancel?decision=${d.id}`,
     });
-    d.payment = { status: "awaiting_payer", orderId: order.orderId, approveUrl: order.approveUrl };
+    d.payment = { status: "awaiting_payer", orderId: order.orderId, approveUrl: order.approveUrl, intent };
     saveDecision(d);
     // Mock mode stands in for a vaulted payment method: allowed purchases settle with no checkout step.
     if (opts.autoCapture && paypalConfig().mode === "mock") await completeCapture(d.id);
@@ -153,7 +155,8 @@ export function ownerReject(id: string): Decision {
 export async function completeCapture(id: string): Promise<Decision> {
   const d = getDecision(id);
   if (!d || !d.payment.orderId) throw new Error("No PayPal order for this decision");
-  if (d.payment.status === "captured") return d;
+  if (d.payment.status === "captured" || d.payment.status === "authorized") return d;
+  if (d.payment.intent === "AUTHORIZE") return authorizeHold(d);
   try {
     const cap = await captureOrder(d.payment.orderId);
     if (cap.status !== "COMPLETED") throw new Error(`PayPal capture status ${cap.status}`);
@@ -168,6 +171,51 @@ export async function completeCapture(id: string): Promise<Decision> {
     }
   } catch (err) {
     d.payment = { ...d.payment, status: "failed", error: (err as Error).message };
+  }
+  return saveDecision(d);
+}
+
+/** Payer approved an AUTHORIZE order: PayPal now holds the money until the owner confirms delivery. */
+async function authorizeHold(d: Decision): Promise<Decision> {
+  try {
+    const auth = await authorizeOrder(d.payment.orderId!);
+    if (auth.status !== "CREATED" && auth.status !== "PENDING") throw new Error(`PayPal authorization status ${auth.status}`);
+    if (auth.amount !== undefined && (Number(auth.amount) !== d.amount || auth.currency !== d.proposal.currency)) {
+      throw new Error(`Authorized ${auth.amount} ${auth.currency}, but ${d.amount.toFixed(2)} ${d.proposal.currency} was approved`);
+    }
+    d.payment = { ...d.payment, status: "authorized", authorizationId: auth.authorizationId };
+  } catch (err) {
+    d.payment = { ...d.payment, status: "failed", error: (err as Error).message };
+  }
+  return saveDecision(d);
+}
+
+/** The item arrived: capture the held money. */
+export async function confirmDelivery(id: string): Promise<Decision> {
+  const d = getDecision(id);
+  if (!d || d.payment.status !== "authorized" || !d.payment.authorizationId) throw new Error("There's no held payment to release for this decision");
+  try {
+    const cap = await captureAuthorization(d.payment.authorizationId, `capture-${d.id}`);
+    if (cap.status !== "COMPLETED" && cap.status !== "PENDING") throw new Error(`PayPal capture status ${cap.status}`);
+    if (cap.amount !== undefined && Number(cap.amount) !== d.amount) throw new Error(`Captured ${cap.amount}, but ${d.amount.toFixed(2)} was approved`);
+    d.payment = { ...d.payment, status: "captured", captureId: cap.captureId };
+    state().knownMerchants.add(d.proposal.merchantId);
+    if (paypalConfig().mode === "mock") registerMockCapture({ id: cap.captureId, status: "COMPLETED", amount: d.amount, currency: d.proposal.currency });
+  } catch (err) {
+    d.payment = { ...d.payment, error: (err as Error).message };
+  }
+  return saveDecision(d);
+}
+
+/** Never arrived, or changed your mind: void the hold. The money never moves. */
+export async function releaseHold(id: string): Promise<Decision> {
+  const d = getDecision(id);
+  if (!d || d.payment.status !== "authorized" || !d.payment.authorizationId) throw new Error("There's no held payment to release for this decision");
+  try {
+    await voidAuthorization(d.payment.authorizationId);
+    d.payment = { ...d.payment, status: "voided" };
+  } catch (err) {
+    d.payment = { ...d.payment, error: (err as Error).message };
   }
   return saveDecision(d);
 }

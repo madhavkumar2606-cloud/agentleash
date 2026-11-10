@@ -31,6 +31,8 @@ export interface CreateOrderInput {
   currency: string;
   returnUrl: string;
   cancelUrl: string;
+  /** AUTHORIZE: PayPal holds the money; capture it later (on delivery) or void it. */
+  intent?: "CAPTURE" | "AUTHORIZE";
 }
 
 export interface CreatedOrder {
@@ -60,7 +62,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder
       "PayPal-Request-Id": input.referenceId,
     },
     body: JSON.stringify({
-      intent: "CAPTURE",
+      intent: input.intent ?? "CAPTURE",
       purchase_units: [
         {
           reference_id: input.referenceId,
@@ -181,4 +183,55 @@ export async function refundCapture(
   if (!res.ok) throw new Error(`PayPal refund failed (${res.status}): ${await res.text()}`);
   const d = await res.json();
   return { refundId: d.id, status: d.status };
+}
+
+// ---- Authorization holds: the money is held by PayPal until the owner confirms delivery ----
+
+/** Authorize an approved order (intent AUTHORIZE). Returns the authorization that holds the funds. */
+export async function authorizeOrder(
+  orderId: string,
+): Promise<{ authorizationId: string; status: string; amount?: string; currency?: string; expiresAt?: string }> {
+  const cfg = paypalConfig();
+  if (cfg.mode === "mock") return { authorizationId: "MOCKAUTH-" + orderId.slice(5), status: "CREATED" };
+  const res = await fetch(`${cfg.baseUrl}/v2/checkout/orders/${orderId}/authorize`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${await accessToken()}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": `authorize-${orderId}`,
+    },
+  });
+  if (!res.ok) throw new Error(`PayPal authorization failed (${res.status}): ${await res.text()}`);
+  const data = await res.json();
+  const auth = data?.purchase_units?.[0]?.payments?.authorizations?.[0];
+  return { authorizationId: auth?.id ?? "", status: auth?.status ?? data.status, amount: auth?.amount?.value, currency: auth?.amount?.currency_code, expiresAt: auth?.expiration_time };
+}
+
+/** Capture a held authorization: the money moves now. Idempotent per requestId. */
+export async function captureAuthorization(authorizationId: string, requestId: string): Promise<{ captureId: string; status: string; amount?: string; currency?: string }> {
+  const cfg = paypalConfig();
+  if (cfg.mode === "mock") return { captureId: "MOCKCAP-" + authorizationId.slice(9), status: "COMPLETED" };
+  const res = await fetch(`${cfg.baseUrl}/v2/payments/authorizations/${encodeURIComponent(authorizationId)}/capture`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${await accessToken()}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": requestId,
+    },
+    body: JSON.stringify({ final_capture: true }),
+  });
+  if (!res.ok) throw new Error(`PayPal capture failed (${res.status}): ${await res.text()}`);
+  const d = await res.json();
+  return { captureId: d.id, status: d.status, amount: d.amount?.value, currency: d.amount?.currency_code };
+}
+
+/** Release a held authorization: the money never moves. */
+export async function voidAuthorization(authorizationId: string): Promise<void> {
+  const cfg = paypalConfig();
+  if (cfg.mode === "mock") return;
+  const res = await fetch(`${cfg.baseUrl}/v2/payments/authorizations/${encodeURIComponent(authorizationId)}/void`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json" },
+  });
+  if (!res.ok && res.status !== 204) throw new Error(`PayPal void failed (${res.status}): ${await res.text()}`);
 }

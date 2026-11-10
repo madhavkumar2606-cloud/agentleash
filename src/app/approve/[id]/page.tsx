@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FlowBar } from "@/components/FlowBar";
+import HoldActions from "@/components/HoldActions";
 import { PriceLine, Stamp } from "@/components/Receipt";
 import { CheckPill, PaymentChip, PayPalMark, usd } from "@/components/ui";
 import { getDecision } from "@/lib/store";
@@ -40,7 +41,7 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
             <p className="font-mono text-xs text-muted">#{d.id.slice(4, 12)} · risk {d.riskScore}/100</p>
           </div>
           <div className="-rotate-[8deg]">
-            <Stamp verdict={d.payment.status === "captured" || d.payment.status === "refunded" || d.payment.status === "approved" ? "ALLOW" : d.verdict} />
+            <Stamp verdict={["captured", "refunded", "approved", "authorized"].includes(d.payment.status) ? "ALLOW" : d.verdict} />
           </div>
         </div>
         <hr className="my-4 border-t-2 border-dashed border-line" />
@@ -86,6 +87,20 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
           <div className="rounded-xl bg-allow-bg p-5 text-allow">
             <p className="text-lg font-semibold">Approved ✓</p>
             <p className="mt-1 text-sm">The agent may now run this PayPal call once.</p>
+          </div>
+        ) : d.payment.status === "authorized" ? (
+          <div className="space-y-3">
+            <div className="rounded-xl bg-[#e6eefb] p-5 text-pp">
+              <p className="text-lg font-semibold">PayPal is holding {usd(d.amount)}</p>
+              <p className="mt-1 text-sm">Nothing has been paid yet. Release it when the item arrives, or cancel the hold.</p>
+              <p className="mt-1 font-mono text-xs">Authorization {d.payment.authorizationId}</p>
+            </div>
+            <HoldActions id={d.id} amount={d.amount} />
+          </div>
+        ) : d.payment.status === "voided" ? (
+          <div className="rounded-xl bg-line/50 p-5">
+            <p className="text-lg font-semibold">Hold cancelled</p>
+            <p className="mt-1 text-sm text-muted">PayPal released the hold. {usd(d.amount)} never left your account.</p>
           </div>
         ) : d.payment.status === "captured" ? (
           <div className="rounded-xl bg-allow-bg p-5 text-allow">
