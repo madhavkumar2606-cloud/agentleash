@@ -3,6 +3,7 @@
 import { AllCommunityModule, ModuleRegistry, themeQuartz, type ColDef, type GridApi } from "ag-grid-community";
 import { AgGridReact, type CustomCellRendererProps } from "ag-grid-react";
 import { useMemo, useRef, useState } from "react";
+import LedgerBar from "./LedgerBar";
 import type { AuditPlan } from "@/lib/auditQuery";
 import type { Decision, Verdict } from "@/lib/types";
 import { PAYMENT_TEXT, PaymentChip, usd, VerdictBadge } from "./ui";
@@ -187,6 +188,7 @@ export default function AuditGrid({ decisions }: { decisions: Decision[] }) {
         <h2 className="text-sm font-semibold">Audit log</h2>
         <p className="text-xs text-muted">Every purchase and refund any agent attempted · AG Grid</p>
       </div>
+      <LedgerBar />
       <form
         className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3"
         onSubmit={(e) => {

@@ -6,6 +6,7 @@
 // Tools:
 //   countersign_get_rules         current spending rules and this week's spend
 //   countersign_request_purchase  submit a purchase; returns ALLOW / REVIEW / BLOCK + PayPal links
+//   countersign_verify_ledger     check the tamper-evident ledger's SHA-256 chain
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -97,6 +98,23 @@ server.registerTool(
     }
     if (d.verdict === "BLOCK") lines.push("Do not make this purchase.");
     return text(lines.join("\n"));
+  },
+);
+
+server.registerTool(
+  "countersign_verify_ledger",
+  {
+    title: "Verify the ledger",
+    description: "Check that Countersign's tamper-evident ledger is intact: every decision, payment, rules change and approval is SHA-256 chained.",
+    inputSchema: {},
+  },
+  async () => {
+    const v = await call("/api/ledger/verify");
+    return text(
+      v.ok
+        ? `Ledger intact: ${v.count} entries, head hash ${v.head}.`
+        : `Ledger BROKEN at entry #${v.brokenAt} of ${v.count}. Do not trust records from that point on.`,
+    );
   },
 );
 

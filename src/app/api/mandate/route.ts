@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { parsePolicy } from "@/lib/firewall/rules";
+import { appendLedger } from "@/lib/ledger";
 import { rateLimit } from "@/lib/rateLimit";
 import { newId, state } from "@/lib/store";
 
@@ -14,5 +15,6 @@ export async function POST(req: NextRequest) {
   const { policy, parsedBy } = await parsePolicy(parsed.data.rulesText);
   const s = state();
   s.mandate = { id: newId("mandate"), rulesText: parsed.data.rulesText, policy, parsedBy, createdAt: new Date().toISOString() };
+  appendLedger("rules.saved", { rules: s.mandate.rulesText, parsedBy, policy });
   return NextResponse.json({ mandate: s.mandate });
 }

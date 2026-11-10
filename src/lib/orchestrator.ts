@@ -6,6 +6,7 @@
 import { paypalConfig } from "./config";
 import { evaluate } from "./firewall";
 import { evaluateToolCall } from "./guard";
+import { appendLedger } from "./ledger";
 import { authorizeOrder, captureAuthorization, captureOrder, createOrder, refundCapture, registerMockCapture, voidAuthorization } from "./paypal";
 import { getDecision, newId, saveDecision, state, weeklySpent } from "./store";
 import type { Decision, PurchaseProposal, ToolCallProposal } from "./types";
@@ -66,6 +67,7 @@ export async function ownerApprove(id: string, origin: string): Promise<Decision
   const d = getDecision(id);
   if (!d) throw new Error("Decision not found");
   if (d.verdict !== "REVIEW" || d.payment.status !== "awaiting_owner") return d;
+  appendLedger("owner.approved", { id: d.id, amount: d.amount, action: d.toolCall ? d.toolCall.tool : "purchase" });
   if (d.toolCall) {
     // Refunds Countersign runs itself. Other PayPal tools: the owner's approval lets the agent's next identical call through.
     if (d.toolCall.tool === "create_refund") return executeRefund(d);
@@ -146,6 +148,7 @@ export function ownerReject(id: string): Decision {
   const d = getDecision(id);
   if (!d) throw new Error("Decision not found");
   if (d.payment.status === "awaiting_owner") {
+    appendLedger("owner.rejected", { id: d.id, amount: d.amount });
     d.payment = { status: "rejected" };
     saveDecision(d);
   }

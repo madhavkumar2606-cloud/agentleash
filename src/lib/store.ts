@@ -4,6 +4,7 @@
 import { SEED_KNOWN_MERCHANTS } from "./catalog";
 import { llmConfig } from "./config";
 import { DEFAULT_RULES, heuristicParsePolicy, parsePolicy } from "./firewall/rules";
+import { appendLedger, recordDecision, resetLedger } from "./ledger";
 import type { Decision, Mandate } from "./types";
 
 interface State {
@@ -50,6 +51,8 @@ export function state(): State {
 
 export function resetState() {
   g.__countersign = freshState();
+  resetLedger();
+  appendLedger("demo.reset", { rules: DEFAULT_RULES });
 }
 
 export function getDecision(id: string) {
@@ -62,6 +65,7 @@ export function saveDecision(d: Decision) {
   d.updatedAt = new Date().toISOString();
   if (i === -1) s.decisions.unshift(d);
   else s.decisions[i] = d;
+  recordDecision(d);
   return d;
 }
 
@@ -79,6 +83,7 @@ export function weeklySpent(now = Date.now()): number {
 
 export function setFrozen(on: boolean) {
   state().frozenAt = on ? new Date().toISOString() : undefined;
+  appendLedger(on ? "kill_switch.on" : "kill_switch.off", {});
 }
 
 /** Random, unguessable IDs (decision IDs appear in approval links). */
