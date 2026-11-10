@@ -733,6 +733,20 @@ function DecisionCard({ d, origin, onChange }: { d: Decision; origin: string; on
             )}
           </div>
         )}
+        {d.dispute && (
+          <p className="rounded-lg bg-block-bg px-3 py-2 text-sm text-block">
+            <span className="font-semibold">PayPal reports a buyer dispute</span>
+            {d.dispute.reason ? ` (${d.dispute.reason.toLowerCase().replace(/_/g, " ")})` : ""}. Agents were frozen until you look into it.
+          </p>
+        )}
+        {d.payment.autoVoided && (
+          <p className="text-xs text-muted">Nobody confirmed delivery in time, so Countersign cancelled the hold. The money never moved.</p>
+        )}
+        {d.paypalEvents?.length ? (
+          <p className="text-xs text-muted">
+            <span className="font-medium text-pp">Confirmed by PayPal webhook:</span> {d.paypalEvents.map((e) => e.type.toLowerCase().replace(/^payment\.|^customer\./, "").replace(/[._]/g, " ")).join(", ")}
+          </p>
+        ) : null}
       </div>
     </div>
   );

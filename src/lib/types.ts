@@ -93,6 +93,10 @@ export interface PaymentInfo {
   /** "AUTHORIZE" when the payment is held by PayPal until delivery. */
   intent?: "CAPTURE" | "AUTHORIZE";
   authorizationId?: string;
+  /** When PayPal started holding the money (for the automatic release of stale holds). */
+  authorizedAt?: string;
+  /** Set when the hold was cancelled automatically because delivery was never confirmed. */
+  autoVoided?: boolean;
   error?: string;
 }
 
@@ -114,6 +118,10 @@ export interface Decision {
   payment: PaymentInfo;
   /** Owner actions on this decision signed by a pinned device, newest last. */
   countersigns?: { action: string; deviceId: string; label: string; fingerprint: string; at: string }[];
+  /** Verified PayPal webhook events about this payment, oldest first. */
+  paypalEvents?: { id: string; type: string; at: string; summary: string }[];
+  /** A buyer opened a dispute on this payment (from a verified webhook). */
+  dispute?: { id: string; reason?: string; status?: string; at: string };
   createdAt: string;
   updatedAt: string;
 }

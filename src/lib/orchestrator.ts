@@ -186,7 +186,7 @@ async function authorizeHold(d: Decision): Promise<Decision> {
     if (auth.amount !== undefined && (Number(auth.amount) !== d.amount || auth.currency !== d.proposal.currency)) {
       throw new Error(`Authorized ${auth.amount} ${auth.currency}, but ${d.amount.toFixed(2)} ${d.proposal.currency} was approved`);
     }
-    d.payment = { ...d.payment, status: "authorized", authorizationId: auth.authorizationId, error: undefined };
+    d.payment = { ...d.payment, status: "authorized", authorizationId: auth.authorizationId, authorizedAt: new Date().toISOString(), error: undefined };
   } catch (err) {
     d.payment = { ...d.payment, status: "failed", error: (err as Error).message };
   }
@@ -230,4 +230,93 @@ export function cancelPayment(id: string): Decision | undefined {
     saveDecision(d);
   }
   return d;
+}
+
+// ---------- Stale holds ----------
+
+/** Hours a hold may wait for "it arrived" before Countersign cancels it. PayPal honours a hold for 3 days. */
+export const holdAutoVoidHours = () => Number(process.env.HOLD_AUTO_VOID_HOURS) || 72;
+
+/** Cancel holds nobody confirmed in time, so money never sits in limbo. Safe to call often. */
+export async function autoReleaseStaleHolds(now = Date.now()): Promise<Decision[]> {
+  const limit = holdAutoVoidHours() * 60 * 60 * 1000;
+  const stale = state().decisions.filter(
+    (d) => d.payment.status === "authorized" && d.payment.authorizationId && now - Date.parse(d.payment.authorizedAt ?? d.updatedAt) > limit,
+  );
+  const out: Decision[] = [];
+  for (const d of stale) {
+    try {
+      await voidAuthorization(d.payment.authorizationId!);
+      d.payment = { ...d.payment, status: "voided", autoVoided: true, error: undefined };
+      appendLedger("hold.auto_voided", { id: d.id, amount: d.amount, authorizationId: d.payment.authorizationId, afterHours: holdAutoVoidHours() });
+    } catch (err) {
+      d.payment = { ...d.payment, error: `Automatic release failed: ${(err as Error).message}` };
+    }
+    out.push(saveDecision(d));
+  }
+  return out;
+}
+
+// ---------- PayPal webhooks (already verified by the route) ----------
+
+export interface PayPalEvent {
+  id: string;
+  event_type: string;
+  summary?: string;
+  resource?: Record<string, unknown> & {
+    id?: string;
+    amount?: { value?: string; currency_code?: string };
+    status?: string;
+    supplementary_data?: { related_ids?: { order_id?: string; authorization_id?: string; capture_id?: string } };
+    disputed_transactions?: { seller_transaction_id?: string }[];
+    reason?: string;
+    links?: { href: string; rel: string }[];
+  };
+}
+
+const seenEvents = (): Set<string> => ((globalThis as unknown as { __csEvents?: Set<string> }).__csEvents ??= new Set());
+
+function findDecisionFor(ev: PayPalEvent): Decision | undefined {
+  const r = ev.resource ?? {};
+  const rel = r.supplementary_data?.related_ids ?? {};
+  const ids = new Set(
+    [r.id, rel.order_id, rel.authorization_id, rel.capture_id, ...(r.disputed_transactions ?? []).map((t) => t.seller_transaction_id)]
+      .concat((r.links ?? []).filter((l) => l.rel === "up").map((l) => l.href.split("/").pop()))
+      .filter(Boolean) as string[],
+  );
+  return state().decisions.find((d) => [d.payment.orderId, d.payment.captureId, d.payment.authorizationId, d.payment.refundId].some((x) => x && ids.has(x)));
+}
+
+/**
+ * Apply a verified PayPal event: record it on the matching payment, flag anything that disagrees with what
+ * Countersign approved, and freeze agents when a buyer disputes an agent payment.
+ */
+export function applyPayPalEvent(ev: PayPalEvent): { matched?: string; duplicate?: boolean; note: string } {
+  if (seenEvents().has(ev.id)) return { duplicate: true, note: "already processed" };
+  seenEvents().add(ev.id);
+  const d = findDecisionFor(ev);
+  const r = ev.resource ?? {};
+  const value = r.amount?.value !== undefined ? Number(r.amount.value) : undefined;
+  let note = ev.summary ?? ev.event_type;
+
+  if (d) {
+    if (ev.event_type === "PAYMENT.CAPTURE.COMPLETED" && value !== undefined && value !== d.amount) {
+      note = `PayPal captured $${value.toFixed(2)}, but Countersign approved $${d.amount.toFixed(2)}`;
+      d.payment = { ...d.payment, error: note };
+    }
+    if (ev.event_type === "PAYMENT.CAPTURE.REFUNDED" || ev.event_type === "PAYMENT.CAPTURE.REVERSED") d.payment = { ...d.payment, status: "refunded" };
+    if (ev.event_type === "PAYMENT.AUTHORIZATION.VOIDED" && d.payment.status === "authorized") d.payment = { ...d.payment, status: "voided" };
+    if (ev.event_type.startsWith("CUSTOMER.DISPUTE.")) {
+      d.dispute = { id: String(r.id ?? ev.id), reason: r.reason as string | undefined, status: r.status as string | undefined, at: new Date().toISOString() };
+      if (ev.event_type === "CUSTOMER.DISPUTE.CREATED" && process.env.FREEZE_ON_DISPUTE !== "off" && !state().frozenAt) {
+        state().frozenAt = new Date().toISOString();
+        appendLedger("kill_switch.on", { reason: "dispute", dispute: d.dispute.id, decision: d.id });
+        note = `Buyer opened a dispute, so Countersign froze all agents`;
+      }
+    }
+    d.paypalEvents = [...(d.paypalEvents ?? []), { id: ev.id, type: ev.event_type, at: new Date().toISOString(), summary: note }].slice(-10);
+    saveDecision(d);
+  }
+  appendLedger("paypal.webhook", { event: ev.id, type: ev.event_type, resource: r.id, decision: d?.id, value });
+  return { matched: d?.id, note };
 }

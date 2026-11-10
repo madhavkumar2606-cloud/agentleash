@@ -238,3 +238,28 @@ export async function voidAuthorization(authorizationId: string): Promise<void> 
   });
   if (!res.ok && res.status !== 204) throw new Error(`PayPal void failed (${res.status}): ${await res.text()}`);
 }
+
+/**
+ * Ask PayPal whether a webhook really came from PayPal for our webhook ID.
+ * https://developer.paypal.com/docs/api/webhooks/v1/#verify-webhook-signature_post
+ */
+export async function verifyWebhookSignature(headers: Headers, event: unknown, webhookId: string): Promise<boolean> {
+  const cfg = paypalConfig();
+  if (cfg.mode === "mock") return false;
+  const h = (k: string) => headers.get(k) ?? "";
+  const res = await fetch(`${cfg.baseUrl}/v1/notifications/verify-webhook-signature`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      auth_algo: h("paypal-auth-algo"),
+      cert_url: h("paypal-cert-url"),
+      transmission_id: h("paypal-transmission-id"),
+      transmission_sig: h("paypal-transmission-sig"),
+      transmission_time: h("paypal-transmission-time"),
+      webhook_id: webhookId,
+      webhook_event: event,
+    }),
+  });
+  if (!res.ok) return false;
+  return (await res.json()).verification_status === "SUCCESS";
+}

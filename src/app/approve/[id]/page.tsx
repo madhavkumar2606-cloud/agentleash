@@ -100,7 +100,10 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
         ) : d.payment.status === "voided" ? (
           <div className="rounded-xl bg-line/50 p-5">
             <p className="text-lg font-semibold">Hold cancelled</p>
-            <p className="mt-1 text-sm text-muted">PayPal released the hold. {usd(d.amount)} never left your account.</p>
+            <p className="mt-1 text-sm text-muted">
+              {d.payment.autoVoided ? "Nobody confirmed delivery in time, so Countersign cancelled it. " : "PayPal released the hold. "}
+              {usd(d.amount)} never left your account.
+            </p>
           </div>
         ) : d.payment.status === "captured" ? (
           <div className="rounded-xl bg-allow-bg p-5 text-allow">
