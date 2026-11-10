@@ -26,7 +26,7 @@ const SCHEMA_HELP = [
   '- agent: agent id text, e.g. "shopping-agent", "support-agent", "mcp-agent"',
   "- action: what the agent tried, e.g. \"Refund $500.00 on payment ...\" or \"1 × Garden Gift eCard\"",
   '- payment: e.g. "Paid via PayPal", "Refunded via PayPal", "No payment", "Waiting for your approval"',
-  '- why: AgentLeash\'s one-line reason, e.g. "Blocked: hidden instructions in a message hijacked the agent..."',
+  '- why: Countersign\'s one-line reason, e.g. "Blocked: hidden instructions in a message hijacked the agent..."',
 ].join("\n");
 
 export async function planAuditQuery(question: string): Promise<AuditPlan> {

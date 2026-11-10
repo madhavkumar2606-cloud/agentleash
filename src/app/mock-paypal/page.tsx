@@ -29,7 +29,7 @@ export default async function MockPayPal({
       </div>
       <div className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
         <PayPalMark className="text-2xl" />
-        <p className="mt-6 text-sm text-muted">Pay AgentLeash merchant</p>
+        <p className="mt-6 text-sm text-muted">Pay Countersign merchant</p>
         <p className="mt-1 text-3xl font-semibold tabular-nums">${amount} USD</p>
         <p className="mt-2 text-sm">{item}</p>
         <p className="mt-1 font-mono text-xs text-muted">Order {token}</p>

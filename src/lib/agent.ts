@@ -1,6 +1,6 @@
 // A deliberately naive demo shopping agent. It browses the demo store and proposes a
 // purchase, and it will happily obey instructions it finds on web pages, which is
-// exactly the behaviour AgentLeash exists to catch. Scenarios are scripted so the
+// exactly the behaviour Countersign exists to catch. Scenarios are scripted so the
 // demo is repeatable; any real agent can call POST /api/firewall/check instead.
 
 import { merchantById, productById, PRODUCTS, type Product } from "./catalog";

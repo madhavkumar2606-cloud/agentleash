@@ -63,7 +63,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <main className="mx-auto min-h-screen max-w-sm px-5 pt-24">
-      <h1 className="text-2xl font-semibold tracking-tight">AgentLeash</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Countersign</h1>
       <p className="mt-1 text-sm text-muted">Only the account owner can change rules and approve purchases.</p>
       <Suspense>
         <LoginForm />

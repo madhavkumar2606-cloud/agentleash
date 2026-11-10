@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Logo } from "./Logo";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Scenario } from "@/lib/agent";
@@ -177,7 +178,7 @@ export default function Dashboard() {
   }
 
   if (!data) {
-    return <main className="grid min-h-screen place-items-center text-muted">Loading AgentLeash…</main>;
+    return <main className="grid min-h-screen place-items-center text-muted">Loading Countersign…</main>;
   }
 
   const decision = run?.decisionId ? data.decisions.find((d) => d.id === run.decisionId) : undefined;
@@ -200,7 +201,7 @@ export default function Dashboard() {
     },
     {
       title: "Approve a payment from your phone",
-      hint: `A $79 gift is over your $${p.approvalThreshold} limit, so AgentLeash asks you first. Approve it and pay with PayPal.`,
+      hint: `A $79 gift is over your $${p.approvalThreshold} limit, so Countersign asks you first. Approve it and pay with PayPal.`,
       action: "Buy the $79 gift",
       done: ds.some((d) => !d.toolCall && d.verdict === "REVIEW" && ["captured", "authorized"].includes(d.payment.status)),
       onRun: () => {
@@ -234,7 +235,7 @@ export default function Dashboard() {
         <Link href="/" className="flex items-center gap-3 rounded-md">
           <Logo />
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">AgentLeash</h1>
+            <h1 className="text-xl font-semibold tracking-tight">Countersign</h1>
             <p className="text-sm text-muted">
               A firewall between your AI agents and your <PayPalMark /> account.
             </p>
@@ -303,7 +304,7 @@ export default function Dashboard() {
             </div>
             {editingRules ? (
               <>
-                <p className="mt-1 text-xs text-muted">Write them in plain English. AgentLeash turns them into checks.</p>
+                <p className="mt-1 text-xs text-muted">Write them in plain English. Countersign turns them into checks.</p>
                 <label htmlFor="rules" className="sr-only">
                   Spending rules for your AI agents
                 </label>
@@ -521,7 +522,7 @@ export default function Dashboard() {
                 <>
                   <p className="font-medium">Pick a scenario to watch the agent shop.</p>
                   <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-                    The agent browses a store and asks to pay. AgentLeash checks the purchase against your task and rules
+                    The agent browses a store and asks to pay. Countersign checks the purchase against your task and rules
                     before PayPal moves any money. Try <strong>Hijacked by a web page</strong> first.
                   </p>
                 </>
@@ -750,7 +751,7 @@ function TrapNote({ fell, scenarioId }: { fell: boolean; scenarioId: string }) {
   }
   return (
     <p className="rise mt-4 rounded-lg bg-paper/10 p-3 text-xs leading-relaxed text-paper/80">
-      <strong className="text-paper">This model resisted the trap this time.</strong> AgentLeash still checked the purchase
+      <strong className="text-paper">This model resisted the trap this time.</strong> Countersign still checked the purchase
       {scenarioId === "injection" ? " and flagged the poisoned page" : scenarioId === "poisoned" ? " and flagged the poisoned ticket" : ""}. Weaker or older agents do fall for it: untick
       “Live AI agent” to replay a vulnerable agent.
     </p>
@@ -788,10 +789,10 @@ function RuleLine({ children }: { children: React.ReactNode }) {
 function Outcome({ d, noDecision }: { d?: Decision; noDecision: boolean }) {
   let tone: "block" | "review" | "allow" | "pp" | "neutral" = "neutral";
   let title = "The agent is working…";
-  let detail = "Watch its steps on the left. AgentLeash checks whatever it tries to pay or refund.";
+  let detail = "Watch its steps on the left. Countersign checks whatever it tries to pay or refund.";
   if (noDecision) {
     title = "The agent decided not to pay for anything.";
-    detail = "There was nothing for AgentLeash to check.";
+    detail = "There was nothing for Countersign to check.";
   } else if (d) {
     const amount = usd(d.amount);
     const what = d.toolCall ? (d.toolCall.tool === "create_refund" ? "refund" : "PayPal action") : "payment";
@@ -893,17 +894,6 @@ function StopIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-function Logo() {
-  return (
-    <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden>
-      <rect width="36" height="36" rx="9" fill="#16150f" />
-      <path d="M11 13.5c0-3 2.4-5.5 5.5-5.5S22 10.5 22 13.5V16" stroke="#f6f4ef" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-      <rect x="8.5" y="16" width="16" height="12" rx="3" fill="#f6f4ef" />
-      <circle cx="16.5" cy="22" r="1.8" fill="#16150f" />
-      <path d="M24.5 22h3.5" stroke="#0070e0" strokeWidth="2.4" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 const iconProps = { width: 18, height: 18, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.6, "aria-hidden": true } as const;
 

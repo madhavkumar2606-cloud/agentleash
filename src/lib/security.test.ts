@@ -32,8 +32,8 @@ describe("auth mode", () => {
 
 describe("origin for PayPal return links", () => {
   it("uses APP_URL when set, even if the Host header is forged", () => {
-    process.env.APP_URL = "https://agentleash.onrender.com/";
-    expect(originOf(req("evil.com"))).toBe("https://agentleash.onrender.com");
+    process.env.APP_URL = "https://countersign.onrender.com/";
+    expect(originOf(req("evil.com"))).toBe("https://countersign.onrender.com");
   });
   it("refuses a public Host header without APP_URL", () => {
     delete process.env.APP_URL;

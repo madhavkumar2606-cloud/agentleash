@@ -8,7 +8,7 @@ import { submitToolCall } from "@/lib/orchestrator";
 import { rateLimit } from "@/lib/rateLimit";
 
 // Check a money-moving PayPal MCP / Agent Toolkit tool call before it runs.
-// Used by the AgentLeash Guard MCP server (mcp/paypal-guard.mts) and by any agent framework.
+// Used by the Countersign Guard MCP server (mcp/paypal-guard.mts) and by any agent framework.
 const Body = z.object({
   agentId: z.string().min(1).max(100).default("mcp-agent"),
   tool: z.string().min(1).max(60),
@@ -16,7 +16,7 @@ const Body = z.object({
   task: z.string().min(1).max(2000),
   context: z.string().max(50000).optional(),
   agentReasoning: z.string().max(4000).default(""),
-  /** Let AgentLeash run the call itself when allowed (supported: create_refund). */
+  /** Let Countersign run the call itself when allowed (supported: create_refund). */
   execute: z.boolean().default(false),
 });
 
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (limited) return limited;
   const key = firewallApiKey();
   if (!key && process.env.APP_URL) {
-    return NextResponse.json({ error: "Set AGENTLEASH_API_KEY to enable this endpoint on a public deployment." }, { status: 503 });
+    return NextResponse.json({ error: "Set COUNTERSIGN_API_KEY to enable this endpoint on a public deployment." }, { status: 503 });
   }
   if (key && !safeEqual(req.headers.get("authorization") ?? "", `Bearer ${key}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

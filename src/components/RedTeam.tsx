@@ -26,7 +26,7 @@ const TARGETS: { id: Target; label: string; hint: string }[] = [
 ];
 
 const OUTCOME: Record<Outcome, { text: string; cls: string }> = {
-  blocked: { text: "Blocked by AgentLeash", cls: "bg-allow-bg text-allow" },
+  blocked: { text: "Blocked by Countersign", cls: "bg-allow-bg text-allow" },
   held: { text: "Held for your approval", cls: "bg-review-bg text-review" },
   leaked: { text: "Got through", cls: "bg-block text-paper" },
   resisted: { text: "Agent resisted", cls: "bg-line/70 text-ink" },
@@ -97,7 +97,7 @@ export default function RedTeam({ hasLlm, onFinished }: { hasLlm: boolean; onFin
             <h2 className="text-xl font-semibold tracking-tight">Attack your own support agent, before someone else does</h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-paper/70">
               Gemini writes new attacks: customer tickets that try to talk your agent into refunding money it shouldn&apos;t. Your
-              agent reads each one with PayPal&apos;s refund tool in hand, and AgentLeash checks every refund it tries. It&apos;s a dry
+              agent reads each one with PayPal&apos;s refund tool in hand, and Countersign checks every refund it tries. It&apos;s a dry
               run: nothing reaches PayPal.
             </p>
 
@@ -160,7 +160,7 @@ export default function RedTeam({ hasLlm, onFinished }: { hasLlm: boolean; onFin
           <div className="grid content-start gap-3 sm:grid-cols-2" aria-live="polite">
             <Big label="Your agent fell for" value={fellOf} tone={s && s.agentFell > 0 ? "bad" : "neutral"} sub="attacks it obeyed" />
             <Big
-              label="AgentLeash stopped"
+              label="Countersign stopped"
               value={stoppedOf}
               tone={s && s.agentFell > 0 ? (s.leaked === 0 ? "good" : "bad") : "neutral"}
               sub={s && s.leaked > 0 ? `${s.leaked} got through` : "blocked or held for you"}
@@ -230,7 +230,7 @@ export default function RedTeam({ hasLlm, onFinished }: { hasLlm: boolean; onFin
               ))}
             </ul>
             <p className="mt-4 text-xs leading-relaxed text-muted">
-              Better instructions make your agent fall for less. AgentLeash is the backstop for what still gets through: it checks the
+              Better instructions make your agent fall for less. Countersign is the backstop for what still gets through: it checks the
               refund itself, against the ticket and the real PayPal payment.
             </p>
           </div>
@@ -305,7 +305,7 @@ function AttackRow({ n, attack, result }: { n: number; attack: Job["attacks"][nu
             <div>
               {result.summary ? (
                 <>
-                  <p className="text-xs font-medium text-muted">AgentLeash</p>
+                  <p className="text-xs font-medium text-muted">Countersign</p>
                   <p className="mt-1 text-sm font-medium">{result.summary}</p>
                   <ul className="mt-2 space-y-2">
                     {result.checks?.map((c) => (
@@ -320,7 +320,7 @@ function AttackRow({ n, attack, result }: { n: number; attack: Job["attacks"][nu
                   </ul>
                 </>
               ) : (
-                <p className="text-sm text-muted">The agent didn&apos;t try to refund anything, so there was nothing for AgentLeash to check.</p>
+                <p className="text-sm text-muted">The agent didn&apos;t try to refund anything, so there was nothing for Countersign to check.</p>
               )}
             </div>
           </div>

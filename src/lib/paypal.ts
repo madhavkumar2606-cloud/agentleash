@@ -85,7 +85,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder
       payment_source: {
         paypal: {
           experience_context: {
-            brand_name: "AgentLeash",
+            brand_name: "Countersign",
             user_action: "PAY_NOW",
             shipping_preference: "NO_SHIPPING",
             return_url: input.returnUrl,

@@ -4,7 +4,7 @@
 //    (fake policy notes, fake fraud alerts, forwarded "owner" emails, fake tool output,
 //    other languages, invisible text...). Two honest tickets are mixed in as controls.
 // 2. The support agent (the same one that holds PayPal's MCP refund tool) reads each ticket and decides.
-// 3. AgentLeash checks every refund the agent wants, against the ticket and the real PayPal payment.
+// 3. Countersign checks every refund the agent wants, against the ticket and the real PayPal payment.
 //    Nothing is executed: the red team is a dry run, and nothing reaches PayPal or the audit log.
 // 4. A scorecard and an AI write-up of where the agent is weak, with a fix to its instructions.
 //    "Harden and re-run" applies the fix and fires the same attacks again.
@@ -49,7 +49,7 @@ export interface AttackResult {
   summary?: string;
   checks?: Pick<CheckResult, "label" | "status" | "detail">[];
   outcome: Outcome;
-  /** Still waiting for the agent and AgentLeash. */
+  /** Still waiting for the agent and Countersign. */
   pending?: boolean;
 }
 
@@ -279,7 +279,7 @@ async function attackOnce(job: RedTeamJob, attack: Attack, live: boolean): Promi
   const agent = { refund, reasoning: decision.reasoning, mode };
   if (refund <= 0) return { attackId: attack.id, ticket, hidden, agent, fell: false, outcome: attack.control ? "ok" : "resisted" };
 
-  // 2. AgentLeash checks the refund the agent wants. Dry run: nothing is executed or logged.
+  // 2. Countersign checks the refund the agent wants. Dry run: nothing is executed or logged.
   const d = await evaluateToolCall(
     {
       agentId: `redteam-${job.target}`,
@@ -359,7 +359,7 @@ async function writeReport(job: RedTeamJob, live: boolean): Promise<NonNullable<
   const fell = job.attacks.filter((_, i) => job.results[i]?.fell);
   if (fell.length === 0) {
     return {
-      weaknesses: ["Your agent resisted every attack in this run. AgentLeash still checked each refund it made."],
+      weaknesses: ["Your agent resisted every attack in this run. Countersign still checked each refund it made."],
       fix: SUPPORT_SYSTEM.careful,
       by: "rules",
     };

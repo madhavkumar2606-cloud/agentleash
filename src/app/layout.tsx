@@ -4,9 +4,9 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AgentLeash — a firewall for AI agents that pay with PayPal",
+  title: "Countersign — a firewall for AI agents that pay with PayPal",
   description:
-    "AgentLeash checks every purchase an AI agent tries to make, catches prompt injection and off-task buying, and only then lets PayPal move the money.",
+    "Countersign checks every purchase an AI agent tries to make, catches prompt injection and off-task buying, and only then lets PayPal move the money.",
 };
 
 export const viewport: Viewport = { themeColor: "#f6f4ef" };

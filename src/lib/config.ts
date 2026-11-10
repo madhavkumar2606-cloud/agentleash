@@ -44,5 +44,5 @@ export function paypalConfig() {
 
 /** Optional shared secret external agents must send to /api/firewall/check. */
 export function firewallApiKey(): string | undefined {
-  return process.env.AGENTLEASH_API_KEY || undefined;
+  return (process.env.COUNTERSIGN_API_KEY || process.env.AGENTLEASH_API_KEY) || undefined;
 }

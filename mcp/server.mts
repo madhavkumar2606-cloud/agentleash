@@ -1,18 +1,18 @@
-// AgentLeash MCP server (stdio). Add it to Claude Desktop, Cursor, or any MCP client so the
-// agent must clear every purchase with AgentLeash before money moves through PayPal.
+// Countersign MCP server (stdio). Add it to Claude Desktop, Cursor, or any MCP client so the
+// agent must clear every purchase with Countersign before money moves through PayPal.
 //
-//   AGENTLEASH_URL=http://localhost:3000 npx tsx mcp/server.mts
+//   COUNTERSIGN_URL=http://localhost:3000 npx tsx mcp/server.mts
 //
 // Tools:
-//   agentleash_get_rules         current spending rules and this week's spend
-//   agentleash_request_purchase  submit a purchase; returns ALLOW / REVIEW / BLOCK + PayPal links
+//   countersign_get_rules         current spending rules and this week's spend
+//   countersign_request_purchase  submit a purchase; returns ALLOW / REVIEW / BLOCK + PayPal links
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const BASE = (process.env.AGENTLEASH_URL || "http://localhost:3000").replace(/\/$/, "");
-const KEY = process.env.AGENTLEASH_API_KEY;
+const BASE = ((process.env.COUNTERSIGN_URL || process.env.AGENTLEASH_URL) || "http://localhost:3000").replace(/\/$/, "");
+const KEY = (process.env.COUNTERSIGN_API_KEY || process.env.AGENTLEASH_API_KEY);
 
 async function call(path: string, init?: RequestInit) {
   const res = await fetch(`${BASE}${path}`, {
@@ -20,16 +20,16 @@ async function call(path: string, init?: RequestInit) {
     headers: { "Content-Type": "application/json", ...(KEY ? { Authorization: `Bearer ${KEY}` } : {}), ...init?.headers },
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error ?? `AgentLeash returned ${res.status}`);
+  if (!res.ok) throw new Error(body.error ?? `Countersign returned ${res.status}`);
   return body;
 }
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 
-const server = new McpServer({ name: "agentleash", version: "0.2.0" });
+const server = new McpServer({ name: "countersign", version: "0.2.0" });
 
 server.registerTool(
-  "agentleash_get_rules",
+  "countersign_get_rules",
   {
     title: "Get spending rules",
     description: "Get the owner's spending rules and how much agents have spent this week. Call this before shopping.",
@@ -50,11 +50,11 @@ server.registerTool(
 );
 
 server.registerTool(
-  "agentleash_request_purchase",
+  "countersign_request_purchase",
   {
     title: "Request a purchase",
     description:
-      "REQUIRED before paying for anything. Submits the purchase to the owner's AgentLeash firewall, which checks it against " +
+      "REQUIRED before paying for anything. Submits the purchase to the owner's Countersign firewall, which checks it against " +
       "the owner's task and rules and scans the pages you read for prompt injection. Only pay if the verdict is ALLOW. " +
       "On REVIEW, give the owner the approval link and wait. On BLOCK, do not buy and tell the owner why.",
     inputSchema: {

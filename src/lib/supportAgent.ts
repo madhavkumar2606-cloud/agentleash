@@ -1,6 +1,6 @@
 // Merchant-side demo: an AI customer-support agent that can call PayPal MCP tools
 // (list_transactions, create_refund). It reads customer tickets, which an attacker can write.
-// AgentLeash checks every refund before PayPal moves money.
+// Countersign checks every refund before PayPal moves money.
 
 import { z } from "zod";
 import { llmConfig, paypalConfig } from "./config";

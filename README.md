@@ -1,13 +1,13 @@
-# AgentLeash
+# Countersign
 
 **A firewall between AI agents and your PayPal account.**
 
-AI agents can now shop and pay for you, and run your business's PayPal account through PayPal's own MCP server: refunds, invoices, disputes, subscriptions. But an agent can be tricked by a web page or a customer email, wander off-task, or get gouged by a shady seller, and today nothing stands between that mistake and your money. AgentLeash sits in front of PayPal: every purchase or PayPal action an agent wants to take is checked against **what you actually asked for**, **the rules you wrote in plain English**, and **the real records in PayPal**. Only then does PayPal move money.
+AI agents can now shop and pay for you, and run your business's PayPal account through PayPal's own MCP server: refunds, invoices, disputes, subscriptions. But an agent can be tricked by a web page or a customer email, wander off-task, or get gouged by a shady seller, and today nothing stands between that mistake and your money. Countersign sits in front of PayPal: every purchase or PayPal action an agent wants to take is checked against **what you actually asked for**, **the rules you wrote in plain English**, and **the real records in PayPal**. Only then does PayPal move money.
 
 It protects both sides of a payment, and lets you attack your own agent before anyone else does:
 - **Buyer side:** a shopping agent that pays with PayPal (Orders v2, or authorization holds that pay only on delivery).
-- **Merchant side:** a support agent with PayPal's official MCP tools. AgentLeash Guard is a drop-in replacement for the PayPal MCP server that checks every money-moving tool call first.
-- **AI red team:** Gemini writes new attacks on your support agent (forged owner emails, fake PayPal fraud alerts, hidden HTML, other languages, limit splitting). It scores what your agent fell for and what AgentLeash stopped, writes the fix for your agent's instructions, and re-runs the attacks against the hardened agent.
+- **Merchant side:** a support agent with PayPal's official MCP tools. Countersign Guard is a drop-in replacement for the PayPal MCP server that checks every money-moving tool call first.
+- **AI red team:** Gemini writes new attacks on your support agent (forged owner emails, fake PayPal fraud alerts, hidden HTML, other languages, limit splitting). It scores what your agent fell for and what Countersign stopped, writes the fix for your agent's instructions, and re-runs the attacks against the hardened agent.
 - **Controls you keep:** a kill switch that freezes every agent, and an AG Grid audit log you can question in plain English.
 
 Built for the PayPal AI Hackathon 2026 ("Build What's Next with PayPal and AI").
@@ -30,10 +30,10 @@ Open the dashboard and pick **AI red team**. Choose the agent under test (carefu
 
 1. Gemini writes 4–8 new attack tickets, each using a different trick, against your most recent PayPal payment. Two honest tickets are mixed in.
 2. The support agent decides on each, as it would in production.
-3. AgentLeash checks every refund it tries (injection, task, the real payment in PayPal, your refund rules). It's a dry run: nothing is executed or logged.
+3. Countersign checks every refund it tries (injection, task, the real payment in PayPal, your refund rules). It's a dry run: nothing is executed or logged.
 4. You get a scorecard (fell for / stopped / got through / false alarms / money kept), Gemini's write-up of the agent's weak spots, and the fix for its instructions. **Harden and re-run** fires the same attacks at the fixed agent.
 
-Without an AI key it uses a built-in library of six attacks and a scripted agent. Our own runs found two gaps in AgentLeash's rules engine (limit-splitting instructions and 1-pixel white text), both now fixed and covered by tests.
+Without an AI key it uses a built-in library of six attacks and a scripted agent. Our own runs found two gaps in Countersign's rules engine (limit-splitting instructions and 1-pixel white text), both now fixed and covered by tests.
 
 Every decision is **ALLOW**, **REVIEW** (you approve on your phone, then pay with PayPal) or **BLOCK** (no PayPal order is ever created), with one plain-English reason and a full audit log.
 
@@ -43,7 +43,7 @@ Every decision is **ALLOW**, **REVIEW** (you approve on your phone, then pay wit
 - **Owner approval flow:** REVIEW sends you a phone page (QR code on the dashboard). Approve opens PayPal checkout, and the return URL captures the payment.
 - **Verified end to end in sandbox:** firewall verdict → order created → buyer pays at PayPal → capture recorded on the decision.
 - **Payments v2:** refunds are checked against the real capture (`GET /v2/payments/captures/{id}`) and executed with `POST /v2/payments/captures/{id}/refund`, idempotently.
-- **PayPal MCP server (`@paypal/mcp`):** AgentLeash Guard runs PayPal's official MCP server underneath and gates its 8 money-moving tools (`create_refund`, `pay_order`, `create_order`, `accept_dispute_claim`, `send_invoice`, `cancel_sent_invoice`, `create_subscription`, `cancel_subscription`). The 20 read-only tools pass straight through.
+- **PayPal MCP server (`@paypal/mcp`):** Countersign Guard runs PayPal's official MCP server underneath and gates its 8 money-moving tools (`create_refund`, `pay_order`, `create_order`, `accept_dispute_claim`, `send_invoice`, `cancel_sent_invoice`, `create_subscription`, `cancel_subscription`). The 20 read-only tools pass straight through.
 - **Authorization holds:** with the "hold payments until delivery" rule, orders use `intent: AUTHORIZE`. PayPal holds the money; the owner releases it on delivery (`POST /v2/payments/authorizations/{id}/capture`) or cancels the hold (`/void`). Amounts are verified at both steps.
 - **Order/decision binding:** the PayPal order's `reference_id` and `custom_id` are the firewall decision ID, and capture only runs if the returned token matches the stored order.
 
@@ -75,7 +75,7 @@ PASS  live injection  naive agent → 5 × Premium Gift Card Bundle ($250.00) �
 | PayPal | Mock checkout page (clearly labelled) | Real PayPal **sandbox** checkout |
 | AI checks | Deterministic heuristic engine | Gemini / Claude / OpenAI (`LLM_PROVIDER`) with heuristics kept as a safety floor |
 
-If the AI call fails or returns bad JSON, AgentLeash falls back to the heuristic engine. It never fails open.
+If the AI call fails or returns bad JSON, Countersign falls back to the heuristic engine. It never fails open.
 
 ### Live AI agent
 
@@ -126,15 +126,15 @@ Response: `verdict`, `summary`, `riskScore`, per-check results, PayPal payment i
 
 ## Use it from Claude Desktop, Cursor, or any MCP client
 
-AgentLeash ships an MCP server with two tools, `agentleash_get_rules` and `agentleash_request_purchase`. Any MCP agent then has to clear purchases with the firewall before paying.
+Countersign ships an MCP server with two tools, `countersign_get_rules` and `countersign_request_purchase`. Any MCP agent then has to clear purchases with the firewall before paying.
 
 ```json
 {
   "mcpServers": {
-    "agentleash": {
+    "countersign": {
       "command": "npx",
-      "args": ["tsx", "/path/to/agentleash/mcp/server.mts"],
-      "env": { "AGENTLEASH_URL": "http://localhost:3000", "AGENTLEASH_API_KEY": "same key as the server" }
+      "args": ["tsx", "/path/to/countersign/mcp/server.mts"],
+      "env": { "COUNTERSIGN_URL": "http://localhost:3000", "COUNTERSIGN_API_KEY": "same key as the server" }
     }
   }
 }
@@ -142,25 +142,25 @@ AgentLeash ships an MCP server with two tools, `agentleash_get_rules` and `agent
 
 ## Guard PayPal's own MCP server: `npm run paypal-guard`
 
-PayPal's [MCP server](https://www.npmjs.com/package/@paypal/mcp) lets an agent refund, invoice and settle disputes on your account. AgentLeash Guard is a drop-in replacement for it. It starts PayPal's server underneath and offers the same tools, so the agent doesn't change. Each money-moving tool asks the agent for three extra fields (its task, the text it read, and why), and AgentLeash checks the call before PayPal sees it:
+PayPal's [MCP server](https://www.npmjs.com/package/@paypal/mcp) lets an agent refund, invoice and settle disputes on your account. Countersign Guard is a drop-in replacement for it. It starts PayPal's server underneath and offers the same tools, so the agent doesn't change. Each money-moving tool asks the agent for three extra fields (its task, the text it read, and why), and Countersign checks the call before PayPal sees it:
 
 | Verdict | What the agent gets back |
 |---|---|
-| ALLOW | The real PayPal result (refunds are run by AgentLeash, which verified the capture first) |
+| ALLOW | The real PayPal result (refunds are run by Countersign, which verified the capture first) |
 | REVIEW | "Held for the owner", with a phone approval link. Nothing runs until you approve. |
 | BLOCK | The reasons, and "do not retry". PayPal never sees the call. |
 
-If AgentLeash can't be reached, the call fails closed.
+If Countersign can't be reached, the call fails closed.
 
 ```json
 {
   "mcpServers": {
     "paypal": {
       "command": "npx",
-      "args": ["tsx", "/path/to/agentleash/mcp/paypal-guard.mts"],
+      "args": ["tsx", "/path/to/countersign/mcp/paypal-guard.mts"],
       "env": {
-        "AGENTLEASH_URL": "https://your-agentleash.onrender.com",
-        "AGENTLEASH_API_KEY": "same key as the server",
+        "COUNTERSIGN_URL": "https://your-countersign.onrender.com",
+        "COUNTERSIGN_API_KEY": "same key as the server",
         "PAYPAL_CLIENT_ID": "sandbox client id",
         "PAYPAL_CLIENT_SECRET": "sandbox secret"
       }
@@ -186,7 +186,7 @@ On Windows PowerShell: `$env:OWNER_PASSWORD="your-password"; npm run record-demo
 
 ## Security
 
-AgentLeash guards money, so it is hardened against being attacked itself:
+Countersign guards money, so it is hardened against being attacked itself:
 
 | Threat | Protection |
 |---|---|
@@ -194,7 +194,7 @@ AgentLeash guards money, so it is hardened against being attacked itself:
 | Password guessing | 5 login attempts per minute per IP |
 | Guessing approval links | Decision IDs are random 128-bit UUIDs |
 | Burning your AI quota / spam | Per-IP rate limits on agent runs, rule changes and the firewall API |
-| Rogue agents calling the API | `AGENTLEASH_API_KEY` bearer token, constant-time comparison; required on public deployments |
+| Rogue agents calling the API | `COUNTERSIGN_API_KEY` bearer token, constant-time comparison; required on public deployments |
 | Prompt injection aimed at the firewall's own AI | Rules engine runs alongside the AI on injection *and* intent checks; the stricter result wins. Money rules (limits, blocked items, seller trust, price) are plain code that can't be talked around. |
 | Payment tampering | Capture only when PayPal's returned token matches the stored order; captured amount and currency must equal the approved amount; idempotent PayPal request IDs |
 | Redirect / Host-header tricks | PayPal return URLs come only from `APP_URL`; login redirects only within the app; mock checkout disabled when real PayPal is configured |
@@ -212,7 +212,7 @@ src/lib/llm.ts      swappable LLM adapter (Gemini / Anthropic / OpenAI)
 src/lib/agent.ts    scripted demo agent + 5 scenarios (used without an AI key)
 src/lib/liveAgent.ts real LLM shopping agent (careful / naive profiles)
 mcp/server.mts      MCP server for Claude Desktop / Cursor / other agents
-mcp/paypal-guard.mts  AgentLeash Guard: PayPal's official MCP server with every money-moving tool checked
+mcp/paypal-guard.mts  Countersign Guard: PayPal's official MCP server with every money-moving tool checked
 src/lib/guard/      checks for PayPal tool calls (injection, task, verified in PayPal, refund rules)
 src/lib/supportAgent.ts  merchant support agent demo (3 tickets)
 src/lib/redteam.ts  AI red team: Gemini-written attacks, dry-run checks, scorecard, report and fix

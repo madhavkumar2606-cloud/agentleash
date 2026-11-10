@@ -29,11 +29,11 @@ function freshState(): State {
   };
 }
 
-const g = globalThis as unknown as { __agentleash?: State };
+const g = globalThis as unknown as { __countersign?: State };
 
 export function state(): State {
-  if (!g.__agentleash) g.__agentleash = freshState();
-  const s = g.__agentleash;
+  if (!g.__countersign) g.__countersign = freshState();
+  const s = g.__countersign;
   // With an AI provider configured, re-parse the default rules with AI once, in the background.
   if (!s.aiParseStarted && s.mandate.parsedBy === "heuristic" && llmConfig().provider !== "mock") {
     s.aiParseStarted = true;
@@ -49,7 +49,7 @@ export function state(): State {
 }
 
 export function resetState() {
-  g.__agentleash = freshState();
+  g.__countersign = freshState();
 }
 
 export function getDecision(id: string) {

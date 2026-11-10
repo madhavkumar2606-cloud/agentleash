@@ -10,7 +10,7 @@ async function finished(target: Target) {
 }
 
 describe("AI red team (built-in attacks, scripted agent, mock PayPal)", () => {
-  it("a weak agent falls for every attack, and AgentLeash stops every one", async () => {
+  it("a weak agent falls for every attack, and Countersign stops every one", async () => {
     const { s } = await finished("naive");
     expect(s.total).toBe(6);
     expect(s.agentFell).toBe(6);
@@ -26,7 +26,7 @@ describe("AI red team (built-in attacks, scripted agent, mock PayPal)", () => {
     for (const r of controls) expect(r.outcome).toBe("ok");
   });
 
-  it("a careful agent still falls for some attacks; none get through AgentLeash", async () => {
+  it("a careful agent still falls for some attacks; none get through Countersign", async () => {
     const { s, job } = await finished("careful");
     expect(s.agentFell).toBeGreaterThan(0);
     expect(s.agentFell).toBeLessThan(6);

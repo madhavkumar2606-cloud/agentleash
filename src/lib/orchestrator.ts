@@ -43,7 +43,7 @@ async function startPayment(d: Decision, origin: string, opts: { autoCapture: bo
     const order = await createOrder({
       intent,
       referenceId: d.id,
-      description: `AgentLeash: ${p.title} from ${p.merchantName}`,
+      description: `Countersign: ${p.title} from ${p.merchantName}`,
       itemName: p.title,
       unitPrice: p.unitPrice,
       quantity: p.quantity,
@@ -67,7 +67,7 @@ export async function ownerApprove(id: string, origin: string): Promise<Decision
   if (!d) throw new Error("Decision not found");
   if (d.verdict !== "REVIEW" || d.payment.status !== "awaiting_owner") return d;
   if (d.toolCall) {
-    // Refunds AgentLeash runs itself. Other PayPal tools: the owner's approval lets the agent's next identical call through.
+    // Refunds Countersign runs itself. Other PayPal tools: the owner's approval lets the agent's next identical call through.
     if (d.toolCall.tool === "create_refund") return executeRefund(d);
     d.payment = { status: "approved" };
     return saveDecision(d);
@@ -97,7 +97,7 @@ const fingerprint = (tool: string, args: Record<string, unknown>) => JSON.string
 
 /**
  * Check a PayPal tool call. If an identical call was approved by the owner and not yet used, it goes straight through.
- * With execute=true, allowed refunds are executed by AgentLeash (it holds the PayPal keys).
+ * With execute=true, allowed refunds are executed by Countersign (it holds the PayPal keys).
  */
 export async function submitToolCall(tc: ToolCallProposal, opts: { execute: boolean }): Promise<Decision> {
   const s = state();
@@ -132,7 +132,7 @@ async function executeRefund(d: Decision): Promise<Decision> {
       String(args.capture_id),
       d.amount,
       d.proposal.currency,
-      String(args.note_to_payer ?? "Refund issued by your support agent, checked by AgentLeash."),
+      String(args.note_to_payer ?? "Refund issued by your support agent, checked by Countersign."),
       d.id,
     );
     d.payment = { status: "refunded", refundId: r.refundId };

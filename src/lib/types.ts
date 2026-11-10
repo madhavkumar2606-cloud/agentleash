@@ -1,4 +1,4 @@
-// Shared domain types for AgentLeash.
+// Shared domain types for Countersign.
 
 export type Currency = "USD";
 

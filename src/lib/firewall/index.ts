@@ -1,4 +1,4 @@
-// The AgentLeash firewall: every purchase an AI agent wants to make is checked here
+// The Countersign firewall: every purchase an AI agent wants to make is checked here
 // before any money moves. Returns ALLOW / REVIEW / BLOCK with plain-English reasons.
 
 import { merchantById, findProduct } from "../catalog";

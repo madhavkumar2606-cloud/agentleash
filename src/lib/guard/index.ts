@@ -1,4 +1,4 @@
-// AgentLeash guard for PayPal MCP / Agent Toolkit tool calls.
+// Countersign guard for PayPal MCP / Agent Toolkit tool calls.
 // Agents that run a business's PayPal account (support bots, ops agents) can refund, capture,
 // accept disputes and cancel subscriptions. Every money-moving call is checked here first:
 //   1. Prompt injection in what the agent read (tickets, emails, pages)

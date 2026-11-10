@@ -19,7 +19,7 @@
 
   --color-pp: #003087;
 
-  /* AgentLeash's scanner: used only where hidden text is detected */
+  /* Countersign's scanner: used only where hidden text is detected */
   --color-uv: #5a3ee0;
   --color-uv-bg: #efebff;
   --color-pp-light: #0070e0;
@@ -53,7 +53,7 @@ body {
 }
 .pulse-twice { animation: pulse-ring 700ms ease-in-out 2; }
 
-/* The cut on the AgentLeash → PayPal link snaps in when a payment is blocked. */
+/* The cut on the Countersign → PayPal link snaps in when a payment is blocked. */
 @keyframes cut-in {
   from { scale: 0.2; opacity: 0; }
   to { scale: 1; opacity: 1; }
@@ -69,7 +69,7 @@ body {
   outline-offset: 2px;
 }
 
-/* Landing hero: one orchestrated replay of the attack. Note appears, $35 travels, AgentLeash stops it. */
+/* Landing hero: one orchestrated replay of the attack. Note appears, $35 travels, Countersign stops it. */
 @keyframes reveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes packet { 0% { left: 0; opacity: 0; } 10% { opacity: 1; } 100% { left: calc(100% - 2.6rem); opacity: 1; } }
 @keyframes gate { to { border-color: #ff8a7a; color: #ff8a7a; } }

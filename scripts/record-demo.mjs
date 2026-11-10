@@ -1,4 +1,4 @@
-// Records the AgentLeash demo video by driving a real browser through the live site:
+// Records the Countersign demo video by driving a real browser through the live site:
 // landing page, the hijack, phone approval + PayPal payment ($79), the support agent with PayPal's MCP tools
 // (a fair refund, then a poisoned ticket), the AI red team (attack, scorecard, report, harden and re-run),
 // the kill switch, and asking the AG Grid audit log.
@@ -306,7 +306,7 @@ try {
   await wait(4500);
   await still(page, "10-poisoned-blocked");
 
-  // 6. AI red team: Gemini attacks the support agent; AgentLeash checks every refund it tries
+  // 6. AI red team: Gemini attacks the support agent; Countersign checks every refund it tries
   await pace();
   await smoothScroll(page, 0, 700);
   await click(page, page.getByRole("tab", { name: "AI red team" }));
@@ -318,8 +318,8 @@ try {
   mark("redteam:launch");
   await runRedTeam(page, "redteam");
   await still(page, "11-redteam-scorecard");
-  // Open the first attack AgentLeash stopped
-  const stopped = page.locator("details summary").filter({ hasText: /Blocked by AgentLeash|Held for your approval/ }).first();
+  // Open the first attack Countersign stopped
+  const stopped = page.locator("details summary").filter({ hasText: /Blocked by Countersign|Held for your approval/ }).first();
   if (await stopped.count()) {
     await click(page, stopped);
     await wait(1200);

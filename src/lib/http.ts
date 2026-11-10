@@ -13,7 +13,7 @@ export function originOf(req: NextRequest): string {
   const host = req.headers.get("host") ?? "localhost:3000";
   const devLan = process.env.NODE_ENV !== "production" && PRIVATE_LAN.test(host);
   if (!LOCAL.test(host) && !devLan) {
-    throw new Error("Set APP_URL to this app's public URL (e.g. https://agentleash.onrender.com).");
+    throw new Error("Set APP_URL to this app's public URL (e.g. https://countersign.onrender.com).");
   }
   return `http://${host}`;
 }

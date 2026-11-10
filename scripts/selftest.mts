@@ -1,4 +1,4 @@
-// AgentLeash self-test. Run with: npm run selftest
+// Countersign self-test. Run with: npm run selftest
 // Checks your keys and runs every scenario against the real PayPal sandbox and AI provider.
 // The report NEVER prints secrets, so it is safe to share.
 
@@ -42,7 +42,7 @@ const scrub = (s: string) =>
 
 const pp = paypalConfig();
 const llm = llmConfig();
-console.log("AgentLeash self-test", new Date().toISOString());
+console.log("Countersign self-test", new Date().toISOString());
 console.log(`Node ${process.version}`);
 console.log(`PayPal: ${pp.mode}${pp.mode === "sandbox" ? ` (client id …${pp.clientId.slice(-4)})` : " (no PAYPAL_CLIENT_ID/SECRET)"}`);
 console.log(`AI: ${llm.provider}${llm.provider !== "mock" ? ` / ${llm.model}` : ` (LLM_PROVIDER=${process.env.LLM_PROVIDER || "unset"}, key ${process.env.LLM_API_KEY ? "set" : "missing"})`}`);
@@ -55,7 +55,7 @@ else {
   try {
     const o = await createOrder({
       referenceId: `selftest-${Date.now()}`,
-      description: "AgentLeash self-test order",
+      description: "Countersign self-test order",
       itemName: "Self-test item",
       unitPrice: 1,
       quantity: 1,

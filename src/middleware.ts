@@ -11,7 +11,7 @@ export async function middleware(req: NextRequest) {
 
   const isApi = req.nextUrl.pathname.startsWith("/api/");
   if (mode === "misconfigured") {
-    const msg = "AgentLeash is deployed without OWNER_PASSWORD. Set it in your hosting environment variables.";
+    const msg = "Countersign is deployed without OWNER_PASSWORD. Set it in your hosting environment variables.";
     return isApi
       ? NextResponse.json({ error: msg }, { status: 503 })
       : new NextResponse(msg, { status: 503, headers: { "Content-Type": "text/plain" } });

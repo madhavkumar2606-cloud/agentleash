@@ -18,7 +18,7 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
 
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 pb-16 pt-8">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">AgentLeash · approval request</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted">Countersign · approval request</p>
       <h1 className="mt-2 text-2xl font-semibold leading-tight tracking-tight">
         {d.toolCall?.tool === "create_refund" ? (
           <>
@@ -63,7 +63,7 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
 
       {flagged.length > 0 && (
         <section className="mt-4 rounded-xl border border-line bg-card p-5">
-          <h2 className="text-sm font-semibold">What AgentLeash flagged</h2>
+          <h2 className="text-sm font-semibold">What Countersign flagged</h2>
           <ul className="mt-3 space-y-3">
             {flagged.map((c) => (
               <li key={c.id} className="flex gap-3">

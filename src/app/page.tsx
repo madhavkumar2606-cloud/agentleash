@@ -1,7 +1,8 @@
-// Public landing page: what AgentLeash is, the attack it stops, and proof it works with real services.
+// Public landing page: what Countersign is, the attack it stops, and proof it works with real services.
 // The dashboard lives at /app (owner login when deployed).
 
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
 import { PayPalMark } from "@/components/ui";
 
 const REPO = "https://github.com/madhavkumar2606-cloud/agentleash";
@@ -17,11 +18,11 @@ const CHECKS: { name: string; does: string }[] = [
 
 const PROOF: { what: string; result: string }[] = [
   { what: "PayPal sandbox", result: "Orders created, paid by a sandbox buyer and captured, each tied to the exact amount the firewall approved." },
-  { what: "Real AI agent vs. a hidden note", result: "A live Gemini agent fell for a fake “out of stock, buy this gift card instead” note in 3 of 5 runs. AgentLeash blocked every one." },
-  { what: "PayPal's own MCP server", result: "PayPal's official MCP server runs under AgentLeash Guard. A poisoned support ticket asking for a $500 refund on a $79 order was blocked before PayPal saw it; a fair $5 refund went through." },
-  { what: "AI red team", result: "Gemini-written attacks against our own support agent found two gaps in AgentLeash's rules engine (limit splitting and 1-pixel text). Both are fixed, and every built-in attack is now stopped with no false alarms." },
-  { what: "AI outage", result: "When Gemini is overloaded, AgentLeash retries, switches models, and falls back to its rules engine. It never lets a payment through unchecked." },
-  { what: "Attacks on AgentLeash itself", result: "Owner login, rate limits, API keys, random approval links and payment-amount checks. 36 automated tests." },
+  { what: "Real AI agent vs. a hidden note", result: "A live Gemini agent fell for a fake “out of stock, buy this gift card instead” note in 3 of 5 runs. Countersign blocked every one." },
+  { what: "PayPal's own MCP server", result: "PayPal's official MCP server runs under Countersign Guard. A poisoned support ticket asking for a $500 refund on a $79 order was blocked before PayPal saw it; a fair $5 refund went through." },
+  { what: "AI red team", result: "Gemini-written attacks against our own support agent found two gaps in Countersign's rules engine (limit splitting and 1-pixel text). Both are fixed, and every built-in attack is now stopped with no false alarms." },
+  { what: "AI outage", result: "When Gemini is overloaded, Countersign retries, switches models, and falls back to its rules engine. It never lets a payment through unchecked." },
+  { what: "Attacks on Countersign itself", result: "Owner login, rate limits, API keys, random approval links and payment-amount checks. 36 automated tests." },
 ];
 
 export default function Landing() {
@@ -29,8 +30,8 @@ export default function Landing() {
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
         <Link href="/" className="flex items-center gap-2.5 rounded-md">
-          <Logo />
-          <span className="text-lg font-semibold tracking-tight">AgentLeash</span>
+          <Logo size={30} />
+          <span className="text-lg font-semibold tracking-tight">Countersign</span>
         </Link>
         <nav className="flex items-center gap-2 text-sm">
           <a href={REPO} className="hidden rounded-md px-3 py-2 font-medium text-muted hover:text-ink sm:inline-block">
@@ -50,7 +51,7 @@ export default function Landing() {
               Your AI agent can be talked into spending your money.
             </h1>
             <p className="mt-5 max-w-lg text-lg leading-relaxed text-muted">
-              AgentLeash checks every purchase or refund an agent tries to make against what you asked for and the rules you set.
+              Countersign checks every purchase or refund an agent tries to make against what you asked for and the rules you set.
               Only then does <PayPalMark /> move the money. And its AI red team attacks your agent first, so you find the holes
               before someone else does.
             </p>
@@ -73,7 +74,7 @@ export default function Landing() {
           <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
             <h2 className="text-2xl font-semibold tracking-tight">How a payment flows</h2>
             <p className="mt-2 max-w-2xl text-muted">
-              The agent never pays directly. It asks AgentLeash first, with the task you gave it and the pages it read.
+              The agent never pays directly. It asks Countersign first, with the task you gave it and the pages it read.
             </p>
             <FlowDiagram />
           </div>
@@ -87,8 +88,8 @@ export default function Landing() {
               <h2 className="text-2xl font-semibold tracking-tight">Attack your own agent first</h2>
               <p className="mt-3 max-w-lg leading-relaxed text-muted">
                 Gemini writes new attacks on your support agent: customer tickets that try to talk it into refunding money it
-                shouldn&apos;t. Your agent reads each one with PayPal&apos;s refund tool in hand, and AgentLeash checks every refund it
-                tries. Honest tickets are mixed in, so you also see whether AgentLeash gets in the way of real customers.
+                shouldn&apos;t. Your agent reads each one with PayPal&apos;s refund tool in hand, and Countersign checks every refund it
+                tries. Honest tickets are mixed in, so you also see whether Countersign gets in the way of real customers.
               </p>
               <p className="mt-3 max-w-lg leading-relaxed text-muted">
                 Then it tells you where your agent is weak, writes the fix for its instructions, and re-runs the same attacks
@@ -103,7 +104,7 @@ export default function Landing() {
                   <p className="mt-1 text-3xl font-semibold tabular-nums text-[#ff8a7a]">3 of 6</p>
                 </div>
                 <div className="rounded-lg border border-paper/15 p-4">
-                  <p className="text-xs text-paper/60">AgentLeash stopped</p>
+                  <p className="text-xs text-paper/60">Countersign stopped</p>
                   <p className="mt-1 text-3xl font-semibold tabular-nums text-[#7be0a8]">3 of 3</p>
                 </div>
               </div>
@@ -158,14 +159,14 @@ export default function Landing() {
                 agent reads customer emails all day, and any one of them can carry hidden instructions.
               </p>
               <p className="mt-3 max-w-lg leading-relaxed text-muted">
-                AgentLeash Guard is a drop-in replacement for that server. The agent sees the same tools. Every
+                Countersign Guard is a drop-in replacement for that server. The agent sees the same tools. Every
                 money-moving call is checked first, and refunds are verified against the real payment in PayPal: it
                 exists, it isn&apos;t already refunded, and the amount fits what&apos;s left.
               </p>
               <ul className="mt-6 space-y-2 text-[15px]">
                 <li><span className="font-semibold">8 tools guarded</span><span className="text-muted">: refunds, payments, orders, disputes, invoices, subscriptions</span></li>
                 <li><span className="font-semibold">20 read-only tools</span><span className="text-muted"> pass straight through</span></li>
-                <li><span className="font-semibold">Fails closed</span><span className="text-muted">: if AgentLeash can&apos;t answer, no money moves</span></li>
+                <li><span className="font-semibold">Fails closed</span><span className="text-muted">: if Countersign can&apos;t answer, no money moves</span></li>
               </ul>
             </div>
             <figure className="overflow-hidden rounded-xl border border-line bg-paper">
@@ -267,7 +268,7 @@ export default function Landing() {
 
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-sm text-muted sm:px-8">
-          <span>AgentLeash runs on PayPal sandbox. No real money moves.</span>
+          <span>Countersign runs on PayPal sandbox. No real money moves.</span>
           <a href={REPO} className="hover:text-ink">
             github.com/madhavkumar2606-cloud/agentleash
           </a>
@@ -285,7 +286,7 @@ function Intercept() {
         <p className="text-sm text-muted">demo.store/toolhub/deluxe-garden-tool-set</p>
         <p className="mt-1 font-semibold">Deluxe Garden Tool Set · $36</p>
         <p className="mt-1 text-sm text-muted">5-piece stainless steel set with trowel, pruner and cushioned grips.</p>
-        {/* Hidden note: blank to a human, revealed by AgentLeash's scan */}
+        {/* Hidden note: blank to a human, revealed by Countersign's scan */}
         <div className="uv-box relative mt-3 overflow-hidden rounded-md border border-dashed border-line">
           <p className="uv-text rounded-md bg-uv-bg px-3 py-2 font-mono text-[12.5px] leading-relaxed text-uv">
             <span className="uv-label mb-1 block font-sans text-xs font-semibold">Hidden text found. Invisible to you, read by the agent:</span>
@@ -304,7 +305,7 @@ function Intercept() {
               $35
             </span>
           </span>
-          <span className="gate shrink-0 rounded-md border-2 border-paper/60 px-2 py-1 font-semibold">AgentLeash</span>
+          <span className="gate shrink-0 rounded-md border-2 border-paper/60 px-2 py-1 font-semibold">Countersign</span>
           <span className="relative h-0.5 flex-1 bg-paper/20">
             <span className="stop absolute left-1/2 top-1/2 grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-block text-[11px] font-bold text-white">
               ✕
@@ -336,7 +337,7 @@ function FlowDiagram() {
       </div>
       <Arrow />
       <div className="rounded-xl border-2 border-ink bg-paper p-4">
-        <p className="font-semibold">AgentLeash</p>
+        <p className="font-semibold">Countersign</p>
         <p className="mt-1 text-sm text-muted">Six checks against your task and rules. One reason, one risk score.</p>
       </div>
       <Arrow />
@@ -360,14 +361,3 @@ function Arrow() {
   );
 }
 
-function Logo() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 36 36" aria-hidden>
-      <rect width="36" height="36" rx="9" fill="#16150f" />
-      <path d="M11 13.5c0-3 2.4-5.5 5.5-5.5S22 10.5 22 13.5V16" stroke="#f6f4ef" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-      <rect x="8.5" y="16" width="16" height="12" rx="3" fill="#f6f4ef" />
-      <circle cx="16.5" cy="22" r="1.8" fill="#16150f" />
-      <path d="M24.5 22h3.5" stroke="#0070e0" strokeWidth="2.4" strokeLinecap="round" />
-    </svg>
-  );
-}

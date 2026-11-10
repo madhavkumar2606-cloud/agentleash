@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const key = firewallApiKey();
   if (!key && process.env.APP_URL) {
     // Deployed publicly without a key would let anyone create orders and spend your AI quota.
-    return NextResponse.json({ error: "Set AGENTLEASH_API_KEY to enable this endpoint on a public deployment." }, { status: 503 });
+    return NextResponse.json({ error: "Set COUNTERSIGN_API_KEY to enable this endpoint on a public deployment." }, { status: 503 });
   }
   if (key && !safeEqual(req.headers.get("authorization") ?? "", `Bearer ${key}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
