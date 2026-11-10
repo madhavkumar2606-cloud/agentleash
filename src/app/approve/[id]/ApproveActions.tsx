@@ -2,27 +2,38 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import CountersignBar from "@/components/CountersignBar";
 import { PayPalMark, usd } from "@/components/ui";
+import { countersign } from "@/lib/deviceKey";
 
 export default function ApproveActions({
   id,
   amount,
+  currency = "USD",
   kind = "purchase",
 }: {
   id: string;
   amount: number;
+  currency?: string;
   kind?: "purchase" | "refund" | "tool";
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<"approve" | "reject">();
   const [error, setError] = useState<string>();
+  const [refreshKey, setRefreshKey] = useState(0);
 
   async function act(action: "approve" | "reject") {
     setBusy(action);
     setError(undefined);
     try {
-      const res = await fetch(`/api/decisions/${id}/${action}`, { method: "POST" });
+      const sig = await countersign({ decisionId: id, action, amount, currency }).catch(() => undefined);
+      const res = await fetch(`/api/decisions/${id}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ countersign: sig }),
+      });
       const body = await res.json();
+      if (body.code === "countersign_required") setRefreshKey((k) => k + 1);
       if (!res.ok) throw new Error(body.error ?? "Something went wrong");
       if (action === "approve" && body.redirect) {
         window.location.href = body.redirect;
@@ -41,6 +52,7 @@ export default function ApproveActions({
 
   return (
     <div className="space-y-3">
+      <CountersignBar refreshKey={refreshKey} />
       <button
         onClick={() => act("approve")}
         disabled={!!busy}

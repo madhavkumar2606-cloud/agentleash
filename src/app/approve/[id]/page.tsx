@@ -77,7 +77,7 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
 
       <section className="mt-6">
         {d.verdict === "REVIEW" && d.payment.status === "awaiting_owner" ? (
-          <ApproveActions id={d.id} amount={d.amount} kind={d.toolCall ? (d.toolCall.tool === "create_refund" ? "refund" : "tool") : "purchase"} />
+          <ApproveActions id={d.id} amount={d.amount} currency={d.proposal.currency} kind={d.toolCall ? (d.toolCall.tool === "create_refund" ? "refund" : "tool") : "purchase"} />
         ) : d.payment.status === "refunded" ? (
           <div className="rounded-xl bg-allow-bg p-5 text-allow">
             <p className="text-lg font-semibold">Refunded through PayPal ✓</p>
@@ -95,7 +95,7 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
               <p className="mt-1 text-sm">Nothing has been paid yet. Release it when the item arrives, or cancel the hold.</p>
               <p className="mt-1 font-mono text-xs">Authorization {d.payment.authorizationId}</p>
             </div>
-            <HoldActions id={d.id} amount={d.amount} />
+            <HoldActions id={d.id} amount={d.amount} currency={d.proposal.currency} />
           </div>
         ) : d.payment.status === "voided" ? (
           <div className="rounded-xl bg-line/50 p-5">
@@ -126,6 +126,16 @@ export default async function ApprovePage({ params }: { params: Promise<{ id: st
           </div>
         )}
       </section>
+      {d.countersigns?.length ? (
+        <ul className="mt-3 space-y-1 text-xs text-muted" aria-label="Countersignatures">
+          {d.countersigns.map((c) => (
+            <li key={c.at + c.action}>
+              {c.action === "approve" ? "Approved" : c.action === "reject" ? "Declined" : c.action === "deliver" ? "Released" : "Hold cancelled"} with a signature from {c.label} (key{" "}
+              <span className="font-mono">{c.fingerprint.slice(0, 8)}</span>) at {new Date(c.at).toISOString().slice(11, 16)} UTC
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <Link href="/app" className="mt-8 inline-block text-sm text-muted underline underline-offset-2">
         Back to dashboard

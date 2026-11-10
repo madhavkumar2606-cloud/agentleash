@@ -697,7 +697,7 @@ function DecisionCard({ d, origin, onChange }: { d: Decision; origin: string; on
               <span className="font-semibold">PayPal is holding the money.</span> Authorization{" "}
               <span className="font-mono text-xs">{d.payment.authorizationId}</span>
             </p>
-            <HoldActions id={d.id} amount={d.amount} size="sm" onDone={onChange} />
+            <HoldActions id={d.id} amount={d.amount} currency={d.proposal.currency} size="sm" onDone={onChange} />
           </div>
         )}
         {d.verdict === "ALLOW" && !d.toolCall && d.payment.status !== "authorized" && (

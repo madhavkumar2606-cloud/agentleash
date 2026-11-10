@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { countersign } from "@/lib/deviceKey";
 import { PayPalMark, usd } from "./ui";
 
 /**
  * PayPal is holding the money (an authorization). The owner releases it to the seller when the item
  * arrives, or voids the hold and the money never moves.
  */
-export default function HoldActions({ id, amount, onDone, size = "md" }: { id: string; amount: number; onDone?: () => void; size?: "sm" | "md" }) {
+export default function HoldActions({ id, amount, currency = "USD", onDone, size = "md" }: { id: string; amount: number; currency?: string; onDone?: () => void; size?: "sm" | "md" }) {
   const [busy, setBusy] = useState<"deliver" | "release">();
   const [error, setError] = useState<string>();
 
@@ -15,7 +16,12 @@ export default function HoldActions({ id, amount, onDone, size = "md" }: { id: s
     setBusy(action);
     setError(undefined);
     try {
-      const res = await fetch(`/api/decisions/${id}/${action}`, { method: "POST" });
+      const sig = await countersign({ decisionId: id, action, amount, currency }).catch(() => undefined);
+      const res = await fetch(`/api/decisions/${id}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ countersign: sig }),
+      });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Something went wrong");
       // Still held after the call means PayPal refused; the error says why.

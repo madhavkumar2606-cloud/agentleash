@@ -112,6 +112,8 @@ export interface Decision {
   toolCall?: { tool: string; args: Record<string, unknown>; context?: string };
   amount: number;
   payment: PaymentInfo;
+  /** Owner actions on this decision signed by a pinned device, newest last. */
+  countersigns?: { action: string; deviceId: string; label: string; fingerprint: string; at: string }[];
   createdAt: string;
   updatedAt: string;
 }

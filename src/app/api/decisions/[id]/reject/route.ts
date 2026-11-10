@@ -1,11 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { ownerReject } from "@/lib/orchestrator";
+import { ownerAction } from "@/lib/ownerAction";
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+/** Owner only (middleware). Needs a countersignature from a pinned device once one is pinned. */
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  try {
-    return NextResponse.json({ decision: ownerReject(id) });
-  } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 404 });
-  }
+  return ownerAction(req, id, "reject", (d) => ownerReject(d.id));
 }

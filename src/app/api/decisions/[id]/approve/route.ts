@@ -1,14 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { originOf } from "@/lib/http";
 import { ownerApprove } from "@/lib/orchestrator";
+import { ownerAction } from "@/lib/ownerAction";
 
+/** Owner only (middleware). Needs a countersignature from a pinned device once one is pinned. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  try {
-    const d = await ownerApprove(id, originOf(req));
-    return NextResponse.json({ decision: d, redirect: d.payment.approveUrl });
-  } catch (err) {
-    const msg = (err as Error).message;
-    return NextResponse.json({ error: msg }, { status: msg.includes("not found") ? 404 : 500 });
-  }
+  return ownerAction(req, id, "approve", (d) => ownerApprove(d.id, originOf(req)));
 }

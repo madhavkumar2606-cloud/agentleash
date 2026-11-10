@@ -254,6 +254,18 @@ try {
   mark("approve-page");
   await wait(3000);
   await still(page, "06-approve-page");
+  // Countersign: pin this browser's key so it signs the approval (password needed if another device is pinned).
+  const cs = page.getByTestId("countersign");
+  await cs.waitFor({ timeout: 5000 }).catch(() => {});
+  if ((await cs.getAttribute("data-state").catch(() => null)) !== "pinned" && (await cs.count())) {
+    await scrollToEl(page, cs, 300);
+    const pw = page.locator("#pin-pw");
+    if (await pw.count()) await pw.fill(PASSWORD);
+    await click(page, page.getByRole("button", { name: "Pin this browser" }));
+    await page.locator('[data-state="pinned"]').waitFor({ timeout: 10000 });
+    mark("countersign:pinned");
+    await wait(2500);
+  }
   await click(page, page.getByRole("button", { name: /Approve/ }));
 
   if (page.url().includes("/mock-paypal")) {
